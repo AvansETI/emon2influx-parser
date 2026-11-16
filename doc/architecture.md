@@ -396,6 +396,103 @@ Only after these steps is switching production discussed.
   - Only one may write to `p1-smartmeters`.
   - The switch itself is a separate decision.
 
+### 11.1 Automatic updates
+
+- Status: **draft**, awaiting approval (2026-11-16)
+
+The LXC cannot be reached from the internet, so it fetches new versions itself (pull), like the
+p1-meter-app (its deployment design). A merge into `main` reaches the LXC without manual steps.
+
+```
+ merge → main
+      │
+      ▼
+ GitHub Actions                       GitHub Releases (public)              LXC
+ ┌──────────────────────┐ upload ┌──────────────────────────────┐  HTTPS ┌─────────────────────────────────┐
+ │ ruff, mypy, pytest   │──────▶ │ pre-release "main-latest"    │◀───────│ emon2influx-update.timer (5 min)│
+ │ build wheel +        │        │  manifest.json               │  poll  │  download, sha256 check         │
+ │ wheelhouse (deps)    │        │  emon2influx-parser-<sha>.tgz│        │  new venv, install offline      │
+ └──────────────────────┘        └──────────────────────────────┘        │  switch symlink, restart        │
+                                                                          │  health check, else rollback    │
+                                                                          └─────────────────────────────────┘
+```
+
+**Release package (CI).** A job `package` runs only on a push to `main`, after the checks passed:
+
+1. Build the wheel of `emon2influx-parser`.
+2. Download all dependencies as wheels into a wheelhouse. They are all pure Python, so the package does not depend on the CPU architecture.
+3. Pack both, plus `deploy/` (unit files and the update script), into `emon2influx-parser-<sha>.tar.gz`.
+4. Write `manifest.json` with: `version`, `sha` (git commit), `sha256` of the tarball, `python` (required minor version, `3.12`), `created`.
+5. Replace the assets of the rolling pre-release `main-latest`.
+
+The version shown in the log becomes `<version>+<short sha>`, so every build is recognisable.
+
+**Updater on the LXC.** The script `emon2influx-update` runs from `emon2influx-update.service` (root, oneshot), started by `emon2influx-update.timer` every 5 minutes. Each run:
+
+1. Download `manifest.json` over HTTPS. Stop when its `sha` is the running one, or is listed as a bad release.
+2. Stop when the LXC's Python does not match `python`. This is logged as an error; Python is upgraded with the OS, not by this script.
+3. Download the tarball and check its sha256 against the manifest. A mismatch stops the update.
+4. Unpack to `/opt/emon2influx-parser/releases/<sha>/`, create a venv there and install from the wheelhouse **offline** (`--no-index`). Nothing is fetched from PyPI on the LXC.
+5. Check the configuration with the new version, without connecting (`python -m emon2influx --check-config`). A configuration the new version rejects stops the update before the switch.
+6. Switch the symlink `/opt/emon2influx-parser/current` to the new release atomically, then restart the service.
+   - The parser stops cleanly on SIGTERM: queue drained, last batch written or spooled.
+   - The spool is plain line protocol, so a new version replays what the old one left.
+7. Health check (below), up to 90 s. On failure:
+   - switch the symlink back and restart the previous release;
+   - record the `sha` as bad, so the timer does not try it again;
+   - log the reason as an error (journald).
+8. Keep the last 3 releases; remove older ones.
+
+**Health.** The parser has no HTTP endpoint. Instead it writes `/var/lib/emon2influx-parser/health.json` every 30 s, atomically:
+- `version`, `started_at`, `updated_at`;
+- `mqtt_connected`;
+- `messages` since the start;
+- `last_written_at`;
+- `spool_files`.
+
+A release counts as healthy when, within 90 s:
+- the service is active;
+- `health.json` shows the new version and was updated in the last 60 s;
+- MQTT is connected;
+- at least one message was processed.
+
+An InfluxDB outage is **not** a reason to roll back: the spool keeps the data, and the old version would have the same problem.
+
+**Timing.** After a merge, the new version runs after:
+
+| Step | Duration |
+| --- | --- |
+| CI checks and package | about 2–3 min |
+| until the timer runs | at most 5 min, about 2.5 min on average |
+| install (offline) | about 30 s |
+| restart | about 5–10 s, during which messages are not received (kits publish with QoS 0) |
+| health check | up to 90 s |
+
+That is about 5–8 minutes in total. The MQTT signal of issue #1 would remove the wait for the timer.
+
+**Manual use.**
+- `sudo emon2influx-update --now`: check now.
+- `sudo emon2influx-update --rollback`: back to the previous release, which is then recorded as current.
+- `journalctl -u emon2influx-update`: what the updater did.
+
+**First installation.** `deploy/install.sh` is read first, then run once as root. It:
+- creates the user, the directories and `/etc/emon2influx-parser/env` (from `.env.example`, mode 600, to be filled in);
+- installs the update script and the units;
+- enables the timer.
+
+The first run of the updater then installs the current release.
+
+**Security.**
+- Downloads come only from `https://github.com/AvansETI/emon2influx-parser/releases`. The repository is public, so no token is needed.
+- The sha256 in the manifest protects against corrupt or incomplete downloads, not against a compromised GitHub account. Branch protection on `main` limits who can release.
+- Only the updater runs as root. The parser keeps its own unprivileged user and its hardening.
+- No secrets are involved. `/etc/emon2influx-parser/env` is never touched by an update.
+
+**Out of scope.**
+- OS and Python upgrades.
+- The MQTT release signal (issue #1).
+- Changes to the env file.
+
 ## 12. Consequences for the p1-meter-app
 
 These are not part of this project; they are listed here so they can be planned:
