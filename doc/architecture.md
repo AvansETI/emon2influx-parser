@@ -169,7 +169,7 @@ Every field can be traced back to the OBIS code it came from.
   - `doc/fields.json`, for scripts and Grafana.
 
   A test fails when either differs from the registry, so they cannot drift.
-- **Optional:** a measurement `dsmr_fields` in the same bucket, with tag `field` and fields `obis`, `description`, `unit`, `derived_from`. It is written at start-up when the registry changed (§13).
+- **In InfluxDB:** a measurement `dsmr_fields` in the same bucket, with tag `field` and fields `obis`, `description`, `unit`, `derived_from`. It is written at start-up when the registry changed, so the mapping can also be found from Flux or Grafana. In dry-run mode it is not written.
 
 ### 4.4 Never stored
 
@@ -357,7 +357,7 @@ These are not part of this project; they are listed here so they can be planned:
 | #   | Topic                       | Proposal                                                                   |
 | --- | --------------------------- | -------------------------------------------------------------------------- |
 | 1   | V02 kits payload            | Different from V01, not yet known. A decoder is added when it is (§3.3). |
-| 5   | Field map in InfluxDB       | `dsmr_fields` measurement next to the docs (§4.3): yes or no.             |
+| 5   | Field map in InfluxDB       | Yes: `dsmr_fields` measurement next to the docs (§4.3). Decided 2026-11-16. |
 | 2   | Approximated cos φ          | Not stored (not in DSMR; P/(U×I) is inaccurate with whole amperes).        |
 | 3   | GitHub repository           | Local only for now; AvansETI later after approval.                         |
-| 4   | InfluxDB host for the test  | Old config uses `192.168.5.31`, the app uses `192.168.5.30`; to be confirmed. |
+| 4   | InfluxDB host               | Dev server: `https://influxdb.sendlab.nl`; production: the local IP address. Decided 2026-11-16. |
