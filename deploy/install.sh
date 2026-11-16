@@ -50,8 +50,12 @@ step "settings"
 if [ -f /etc/emon2influx-parser/env ]; then
   echo "    keeping existing /etc/emon2influx-parser/env"
 else
-  # Read by systemd as root; the parser itself never reads this file.
-  fetch .env.example /etc/emon2influx-parser/env
+  # Read by systemd as root; the parser itself never reads this file. The paths are left out:
+  # the service sets them (an env file would override its Environment= lines).
+  tmp_env="$(mktemp)"
+  fetch .env.example "$tmp_env"
+  grep -vE '^(SPOOL_DIR|LOG_DIR|QUARANTINE_FILE|HEALTH_FILE)=' "$tmp_env" >/etc/emon2influx-parser/env
+  rm -f "$tmp_env"
   chmod 600 /etc/emon2influx-parser/env
   echo "    created /etc/emon2influx-parser/env from .env.example: fill it in"
 fi
