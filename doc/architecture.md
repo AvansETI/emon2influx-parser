@@ -409,7 +409,7 @@ p1-meter-app (its deployment design). A merge into `main` reaches the LXC withou
       ▼
  GitHub Actions                       GitHub Releases (public)              LXC
  ┌──────────────────────┐ upload ┌──────────────────────────────┐  HTTPS ┌─────────────────────────────────┐
- │ ruff, mypy, pytest   │──────▶ │ pre-release "main-latest"    │◀───────│ emon2influx-update.timer (5 min)│
+ │ ruff, mypy, pytest   │──────▶ │ pre-release "main-latest"    │◀───────│ emon2influx-update.timer (1 min)│
  │ build wheel +        │        │  manifest.json               │  poll  │  download, sha256 check         │
  │ wheelhouse (deps)    │        │  emon2influx-parser-<sha>.tgz│        │  new venv, install offline      │
  └──────────────────────┘        └──────────────────────────────┘        │  switch symlink, restart        │
@@ -427,9 +427,12 @@ p1-meter-app (its deployment design). A merge into `main` reaches the LXC withou
 
 The version shown in the log becomes `<version>+<short sha>`, so every build is recognisable.
 
-**Updater on the LXC.** The script `emon2influx-update` runs from `emon2influx-update.service` (root, oneshot), started by `emon2influx-update.timer` every 5 minutes. Each run:
+**Updater on the LXC.** The script `emon2influx-update` runs from `emon2influx-update.service` (root, oneshot), started by `emon2influx-update.timer` every minute. Each run:
 
 1. Download `manifest.json` over HTTPS. Stop when its `sha` is the running one, or is listed as a bad release.
+   - The URL is the direct download link `https://github.com/AvansETI/emon2influx-parser/releases/download/main-latest/manifest.json`, **not** the REST API.
+   - Unauthenticated REST API calls are limited to 60 per hour per public IP address. The p1-meter-app updater already uses 30 per hour from the same network, every 2 minutes. Polling the API every minute would exceed the limit and delay the updates of both.
+   - The download link is not under that limit. It costs about 1 kB per minute; the package itself is only downloaded when the commit differs.
 2. Stop when the LXC's Python does not match `python`. This is logged as an error; Python is upgraded with the OS, not by this script.
 3. Download the tarball and check its sha256 against the manifest. A mismatch stops the update.
 4. Unpack to `/opt/emon2influx-parser/releases/<sha>/`, create a venv there and install from the wheelhouse **offline** (`--no-index`). Nothing is fetched from PyPI on the LXC.
@@ -463,12 +466,12 @@ An InfluxDB outage is **not** a reason to roll back: the spool keeps the data, a
 | Step | Duration |
 | --- | --- |
 | CI checks and package | about 2–3 min |
-| until the timer runs | at most 5 min, about 2.5 min on average |
+| until the timer runs | at most 1 min, about 30 s on average |
 | install (offline) | about 30 s |
 | restart | about 5–10 s, during which messages are not received (kits publish with QoS 0) |
 | health check | up to 90 s |
 
-That is about 5–8 minutes in total. The MQTT signal of issue #1 would remove the wait for the timer.
+That is about 3–5 minutes in total, mostly CI. The MQTT signal of issue #1 would remove the wait for the timer.
 
 **Manual use.**
 - `sudo emon2influx-update --now`: check now.
