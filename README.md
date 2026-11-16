@@ -46,6 +46,19 @@ Replays logs of the old `emon2influx` through the new parser and reports the dif
 .venv/bin/python -m emon2influx.tools.replay /path/to/emon2influx.log
 ```
 
+## Correcting swapped counters in history
+
+One-off, after the switch to this parser (doc/architecture.md §13):
+
+```sh
+python -m emon2influx.tools.fix_orientation plan  --env read.env  --until <switch time>
+python -m emon2influx.tools.fix_orientation apply --env write.env --plan plan.json --yes \
+    --allow-production
+```
+
+`plan` is read-only. `apply` backs up every period first; `restore --backup FILE --yes` undoes
+it. Rehearse with `copy` into the test bucket first.
+
 ## Deployment
 
 Directly on an LXC (Ubuntu 24.04, Python 3.12) with systemd; no container images. The LXC

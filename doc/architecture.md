@@ -540,6 +540,38 @@ No other field is touched.
 2. The history up to the switch is corrected.
 3. The app keeps its orientation detection as a safety net.
 
+**Usage** (`python -m emon2influx.tools.fix_orientation`):
+
+| Command | What it does | Writes |
+| --- | --- | --- |
+| `plan --env F --until T` | votes per day per household and lists the swapped periods before `T`, plus segments to review; writes `plan.json` | no |
+| `apply --env F --plan plan.json --yes` | backup, swap from the backup, record in `dsmr_corrections`, verify | yes |
+| `verify --env F --plan plan.json` | the votes per period now | no |
+| `restore --env F --backup FILE --yes` | writes the original values back and records the restore | yes |
+| `copy --source-env F --env F --signature S --from A --until B` | copies a household's history into a test bucket for a rehearsal | test bucket only |
+
+`--env F` is a file with `INFLUX_URL`, `INFLUX_ORG`, `INFLUX_BUCKET` and `INFLUX_TOKEN`. Writing to `p1-smartmeters` also needs `--allow-production`. `plan.json` and the backups contain full signatures and stay private (git-ignored).
+
+**Implementation details:**
+
+- **Daily statistics** are queried in blocks of 60 days. Years in one query exceed the reverse proxy's time-out. On the LXC, which reaches InfluxDB directly, a full plan is faster than through the proxy (about one minute per household with years of data).
+- **The swap is computed from the backup**, not from the live data. An interrupted run that is started again writes the same values again; nothing is swapped back.
+- **Stricter than the app's rule:**
+  - only days with a margin of at least 0.2 kWh between the two counters vote;
+  - gaps take the orientation of their neighbours only when both agree;
+  - a swapped segment needs at least 3 clear days and an agreement of 80 %;
+  - a short contradicting run between two equal neighbours is treated as noise.
+
+**Rehearsal on 2026-11-16.** One week of a known swapped household was copied into the test bucket. Then:
+
+1. `plan` found one period (6 clear days, 100 % agreement).
+2. `apply` swapped 18,860 points; verify then voted as-named on all clear days.
+3. A second `plan` found nothing.
+4. A second `apply` skipped the period.
+5. `restore` brought back the original values, and verify voted swapped again.
+
+A read-only `plan` on `p1-smartmeters` for the same household found one period of 972 days (931 clear days, 100 % agreement).
+
 **Not correctable: the zeros for missing gas.** InfluxDB 2 can only delete whole points, by
 tag and time, not a single field. The `gas_delivered=0` values written for households
 without gas therefore stay in history; only new data omits them.
