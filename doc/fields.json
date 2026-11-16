@@ -1,5 +1,5 @@
 {
-  "registry": "a3b66ee46beff6dc",
+  "registry": "4d833267a5c9453b",
   "fields": [
     {
       "field": "power_consumed",
@@ -552,6 +552,18 @@
       "unit": null,
       "type": "string",
       "description": "3-letter manufacturer code from the identification line (e.g. KFM, XMX); the rest of that line is not stored because it may contain a serial number",
+      "occurs": "all",
+      "point": "electricity",
+      "derived": true
+    },
+    {
+      "field": "crc_valid",
+      "obis": [
+        "CRC after !"
+      ],
+      "unit": null,
+      "type": "bool",
+      "description": "Whether the CRC16 of the telegram matched; absent for meters without a CRC. Telegrams with a wrong CRC are still written (their values were found plausible), so they can be filtered or analysed later",
       "occurs": "all",
       "point": "electricity",
       "derived": true

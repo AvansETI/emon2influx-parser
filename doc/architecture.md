@@ -92,7 +92,10 @@ UTF-8 JSON:
 ### 3.4 Telegram
 
 - It starts at `/`, followed by the identification line, and ends at `!`, followed by an optional CRC16.
-- **CRC:** with `REQUIRE_VALID_CRC=true` a telegram with a CRC that does not match is rejected. The CRC is CRC-16/ARC over `/` up to and including `!`.
+- **CRC:** CRC-16/ARC over `/` up to and including `!`. The result is stored as `crc_valid`.
+  - The old logs of 2026-11-16 showed a wrong CRC in 7.7 % of the telegrams that have one: never for half of the kits, always for two. In 648 checked cases the counters lay between those of the previous and next good telegram of the same kit, so the values are plausible. The cause, probably in the kit firmware, is not known.
+  - Such telegrams are therefore **written with `crc_valid=false`**, counted, and logged as a warning (rate-limited).
+  - With `REQUIRE_VALID_CRC=true` they are rejected instead.
 - **Telegrams without a CRC** (DSMR 2.2/3) are accepted.
 - **Version** comes from `1-3:0.2.8` (NL), `0-0:96.1.4` (BE) or is absent (old meters). It is stored as metadata only. Fields are recognised by their OBIS code, not by a parser per version, so a new version needs no new code path.
 
@@ -126,6 +129,7 @@ Timestamp: the time the message was received, in UTC (§5).
 | `reactive_power_consumed`, `_produced`                | 1-0:3.7.0, 1-0:4.7.0              | kvar  | LU (Smarty)                         |
 | `reactive_energy_consumed`, `_produced`               | 1-0:3.8.0, 1-0:4.8.0              | kvarh | LU (Smarty)                         |
 | `meter_manufacturer`                                  | identification line               | –     | string: the 3-letter code (`KFM`, `XMX`, …) |
+| `crc_valid`                                           | CRC after `!`                     | –     | boolean; absent without a CRC (§3.4) |
 | `dsmr_version`                                        | 1-3:0.2.8 / 0-0:96.1.4            | –     | string, e.g. `50`, `42`, `BE50217`; absent when none |
 | `clock_offset_s`                                      | 0-0:1.0.0                         | s     | receipt time minus meter clock      |
 
@@ -259,7 +263,7 @@ Limit: messages that never arrive are lost. That happens when the parser itself 
 | `payload_shape`   | `1`, missing `datagram.p1`           | message rejected (logged at DEBUG; expected noise) |
 | `payload_unsupported` | prefix without a decoder (V02 for now) | message rejected and quarantined |
 | `signature`       | wrong prefix or format               | message rejected               |
-| `crc`             | CRC mismatch                         | message rejected               |
+| `crc`             | CRC mismatch                         | written with `crc_valid=false` (warning); rejected with `REQUIRE_VALID_CRC=true` |
 | `telegram`        | no `/` or `!`, truncated             | message rejected               |
 | `field`           | unparsable value, unexpected unit    | field skipped, rest written    |
 | `mbus_time`       | capture time far from receipt time   | reading written at receipt time |

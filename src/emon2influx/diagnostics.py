@@ -55,6 +55,7 @@ class ErrorReporter:
         raw: bytes | str | None = None,
         quarantine: bool = False,
         count: int = 1,
+        level: int | None = None,
     ) -> None:
         with self._lock:
             self._roll_hour()
@@ -62,7 +63,9 @@ class ErrorReporter:
             key = (signature, category.value)
             self._logged[key] += 1
             full = self._logged[key] <= self.limit
-            if category == Category.PAYLOAD_SHAPE:
+            if level is not None:
+                pass
+            elif category == Category.PAYLOAD_SHAPE:
                 level = logging.DEBUG
             else:
                 level = (

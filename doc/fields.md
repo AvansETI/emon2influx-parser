@@ -3,7 +3,7 @@
 Every field in the `dsmr` measurement and the DSMR/OBIS code it comes from.
 Generated from `src/emon2influx/telegram/registry.py` by
 `python -m emon2influx.tools.fields`; do not edit by hand.
-Registry version `a3b66ee46beff6dc`; the same map is in the `dsmr_fields`
+Registry version `4d833267a5c9453b`; the same map is in the `dsmr_fields`
 measurement in InfluxDB.
 
 A field is only written when its code is in the telegram. M-Bus fields
@@ -52,6 +52,7 @@ others share one point at the receipt time.
 | `energy_produced` | `1-0:2.8.1`, `1-0:2.8.2`, `1-0:2.8.0` (derived) | kWh | float | electricity | all | Electricity delivered by the client, all tariffs: 2.8.1 + 2.8.2, or 2.8.0 |
 | `clock_offset_s` | `0-0:1.0.0` (derived) | s | int | electricity | all | Receipt time minus the meter clock, in whole seconds |
 | `meter_manufacturer` | `identification line` (derived) | - | string | electricity | all | 3-letter manufacturer code from the identification line (e.g. KFM, XMX); the rest of that line is not stored because it may contain a serial number |
+| `crc_valid` | `CRC after !` (derived) | - | bool | electricity | all | Whether the CRC16 of the telegram matched; absent for meters without a CRC. Telegrams with a wrong CRC are still written (their values were found plausible), so they can be filtered or analysed later |
 | `dsmr_version` | `1-3:0.2.8`, `0-0:96.1.4` (derived) | - | string | electricity | all | P1 version, e.g. 50 or 42; BE versions are prefixed with BE |
 | `gas_delivered` | `0-n:24.2.1`, `0-n:24.2.3`, `0-n:24.3.0` | m3 | float | mbus | M-Bus device type 3 | Gas meter reading; time = capture time from the telegram (0-n:24.3.0: DSMR 2.2/3, 0-n:24.2.3: BE) |
 | `water_delivered` | `0-n:24.2.1` | m3 | float | mbus | M-Bus device type 7 | Water meter reading; time = capture time from the telegram |

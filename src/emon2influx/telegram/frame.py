@@ -23,6 +23,9 @@ class TelegramFrame:
     identification: str
     lines: list[str]
     crc: int | None
+    # None when the telegram has no CRC (meters before DSMR 4).
+    crc_valid: bool | None = None
+    crc_computed: int | None = None
 
     @classmethod
     def parse(cls, text: str, *, require_valid_crc: bool) -> "TelegramFrame":
@@ -37,22 +40,24 @@ class TelegramFrame:
 
         trailer = text[end + 1 :].strip()
         crc: int | None = None
+        computed: int | None = None
         if trailer:
             if not _CRC.fullmatch(trailer[:4]):
                 raise RejectedMessage(Category.CRC, "unreadable CRC", line="!" + trailer[:8])
             crc = int(trailer[:4], 16)
-            body = text[start : end + 1].encode("latin-1", "replace")
-            if require_valid_crc and crc16(body) != crc:
+            computed = crc16(text[start : end + 1].encode("latin-1", "replace"))
+            if require_valid_crc and computed != crc:
                 raise RejectedMessage(
-                    Category.CRC,
-                    f"CRC mismatch: telegram says {crc:04X}, computed {crc16(body):04X}",
+                    Category.CRC, f"CRC mismatch: telegram says {crc:04X}, computed {computed:04X}"
                 )
 
         content = text[start + 1 : end].replace("\r", "").split("\n")
         identification = content[0].strip()
         if not identification:
             raise RejectedMessage(Category.TELEGRAM, "empty identification line")
-        return cls(identification, [line for line in content[1:] if line.strip()], crc)
+        lines = [line for line in content[1:] if line.strip()]
+        valid = None if crc is None else crc == computed
+        return cls(identification, lines, crc, valid, computed)
 
     @property
     def manufacturer(self) -> str | None:

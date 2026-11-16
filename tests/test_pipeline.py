@@ -105,12 +105,27 @@ class TestPipeline:
         assert "gas_delivered" not in line
         assert "energy_produced=0," in line  # a float; the client writes 0.0 as 0
 
-    def test_rejected_message_is_quarantined_without_identifiers(self, tmp_path: Path) -> None:
+    def test_wrong_crc_is_written_with_a_flag(self, tmp_path: Path) -> None:
         pipeline, quarantine = make(tmp_path)
         broken = with_crc(DSMR50_LINES).replace("01.193", "01.194")
-        assert pipeline.process(payload(broken), RECEIVED) == []
+        electricity, _gas = pipeline.process(payload(broken), RECEIVED)
+        assert "crc_valid=false" in electricity
+        assert "power_consumed=1.194" in electricity
+        assert pipeline.reporter.take_counts() == {"crc": 1}
+        assert not quarantine.exists()
+
+    def test_valid_crc_is_flagged_true_and_old_meters_have_no_flag(self, tmp_path: Path) -> None:
+        pipeline, _ = make(tmp_path)
+        assert "crc_valid=true" in pipeline.process(payload(with_crc(DSMR50_LINES)), RECEIVED)[0]
+        [old] = pipeline.process(payload(without_crc(NO_GAS_LINES)), RECEIVED)
+        assert "crc_valid" not in old
+
+    def test_rejected_message_is_quarantined_without_identifiers(self, tmp_path: Path) -> None:
+        pipeline, quarantine = make(tmp_path)
+        truncated = with_crc(DSMR50_LINES).split("!")[0]
+        assert pipeline.process(payload(truncated), RECEIVED) == []
         [record] = [json.loads(line) for line in quarantine.read_text().splitlines()]
-        assert record["category"] == "crc"
+        assert record["category"] == "telegram"
         assert record["signature"] == SIGNATURE
         assert EAN not in record["raw"]
         assert "0-0:96.1.1(…)" in record["raw"]

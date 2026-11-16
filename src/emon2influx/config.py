@@ -80,7 +80,7 @@ class Settings:
             spool_dir=Path(reader.text("SPOOL_DIR", "spool")),
             spool_max_mb=reader.integer("SPOOL_MAX_MB", 2048, 1, 1_000_000),
             signature_prefixes=reader.prefixes("SIGNATURE_PREFIXES", "2019-ETI-EMON-V01"),
-            require_valid_crc=reader.boolean("REQUIRE_VALID_CRC", True),
+            require_valid_crc=reader.boolean("REQUIRE_VALID_CRC", False),
             mode=mode,
             log_level=reader.choice(
                 "LOG_LEVEL", ("DEBUG", "INFO", "WARNING", "ERROR"), "INFO", upper=True

@@ -13,7 +13,7 @@ from .obis import ObisLine, ObisValue, join_continuations, parse_line
 from .registry import BY_OBIS, EXCLUDED, MBUS_BY_TYPE, MBUS_READINGS, SOURCE_ONLY, FieldSpec
 from .timestamp import parse_meter_time
 
-Value = float | int | str
+Value = float | int | str | bool
 
 # A capture time further than this from the receipt time is not trusted (§5).
 MAX_CAPTURE_SKEW = timedelta(hours=2)
@@ -47,12 +47,23 @@ class Reading:
 
 
 class TelegramParser:
-    def __init__(self, *, require_valid_crc: bool = True) -> None:
+    def __init__(self, *, require_valid_crc: bool = False) -> None:
         self.require_valid_crc = require_valid_crc
 
     def parse(self, text: str, received_at: datetime) -> Reading:
         frame = TelegramFrame.parse(text, require_valid_crc=self.require_valid_crc)
         reading = Reading(received_at, frame.manufacturer, None, None)
+        if frame.crc_valid is not None:
+            reading.electricity["crc_valid"] = frame.crc_valid
+            if not frame.crc_valid:
+                assert frame.crc is not None and frame.crc_computed is not None
+                reading.issues.append(
+                    FieldIssue(
+                        "crc",
+                        f"CRC mismatch, written with crc_valid=false: telegram says "
+                        f"{frame.crc:04X}, computed {frame.crc_computed:04X}",
+                    )
+                )
 
         lines: dict[str, ObisLine] = {}
         mbus: dict[int, list[ObisLine]] = {}

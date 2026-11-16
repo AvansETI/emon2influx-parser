@@ -1,5 +1,6 @@
 """One MQTT message → line-protocol lines, with every problem reported (§6, §8)."""
 
+import logging
 from collections import Counter
 from datetime import datetime
 
@@ -54,6 +55,8 @@ class Pipeline:
                 meter=reading.manufacturer,
                 version=reading.version,
                 line=issue.line,
+                # The message is still written: a warning, not an error.
+                level=logging.WARNING,
             )
         self.unknown_codes.update(reading.unknown_codes)
         lines = self.builder.build(signature, reading)

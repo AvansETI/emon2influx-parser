@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from dataclasses import field as dc_field
 from typing import Literal
 
-Kind = Literal["float", "int", "string"]
+Kind = Literal["float", "int", "string", "bool"]
 
 KW = {"kW": 1.0, "W": 0.001}
 KWH = {"kWh": 1.0, "Wh": 0.001}
@@ -291,6 +291,15 @@ DERIVED: tuple[DerivedSpec, ...] = (
         "string",
         "3-letter manufacturer code from the identification line (e.g. KFM, XMX); the "
         "rest of that line is not stored because it may contain a serial number",
+    ),
+    DerivedSpec(
+        "crc_valid",
+        ("CRC after !",),
+        None,
+        "bool",
+        "Whether the CRC16 of the telegram matched; absent for meters without a CRC. "
+        "Telegrams with a wrong CRC are still written (their values were found plausible), "
+        "so they can be filtered or analysed later",
     ),
     DerivedSpec(
         "dsmr_version",

@@ -16,6 +16,10 @@ def _ns(moment: datetime) -> int:
     return (moment - _EPOCH) // timedelta(microseconds=1) * 1000
 
 
+# Fields that describe the telegram rather than measure anything.
+METADATA = frozenset({"meter_manufacturer", "dsmr_version", "crc_valid"})
+
+
 class PointBuilder:
     def __init__(self, measurement: str) -> None:
         self.measurement = measurement
@@ -23,7 +27,7 @@ class PointBuilder:
     def build(self, signature: Signature, reading: Reading) -> list[str]:
         lines: list[str] = []
         # Identification fields alone are not a measurement.
-        if any(k not in ("meter_manufacturer", "dsmr_version") for k in reading.electricity):
+        if any(k not in METADATA for k in reading.electricity):
             point = Point(self.measurement).tag("signature", signature.value)
             for name, value in sorted(reading.electricity.items()):
                 point = point.field(name, value)

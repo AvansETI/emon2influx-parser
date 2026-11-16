@@ -6,6 +6,7 @@
 # Runtime data
 logs/
 spool/
+state/
 *.jsonl
 
 # Python

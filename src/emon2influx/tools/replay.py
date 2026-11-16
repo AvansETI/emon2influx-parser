@@ -54,6 +54,8 @@ def compare(old: dict[str, str], new_lines: list[str]) -> list[str]:
         if match:
             new.update(parse_fields(match.group(2)))
     outcomes: list[str] = []
+    if new.get("crc_valid") == "false":
+        outcomes.append("written with crc_valid=false")
     oc, op = num(old, "energy_consumed"), num(old, "energy_produced")
     nc, np_ = num(new, "energy_consumed"), num(new, "energy_produced")
     if None not in (oc, op, nc, np_) and abs(oc - nc) > 1e-3:  # type: ignore[operator]
@@ -68,7 +70,14 @@ def compare(old: dict[str, str], new_lines: list[str]) -> list[str]:
         outcomes.append("gas 0 → absent" if old_gas == 0 else "gas missing in new")
     elif old_gas is None or abs(old_gas - new_gas) > 1e-3:
         outcomes.append("gas differs")
-    return outcomes or ["identical"]
+    return (
+        outcomes
+        if any(o != "written with crc_valid=false" for o in outcomes)
+        else [
+            *outcomes,
+            "identical",
+        ]
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -80,14 +89,16 @@ def main(argv: list[str] | None = None) -> int:
         "--log-timezone", default="UTC", help="time zone of the old log's timestamps (default UTC)"
     )
     parser.add_argument("--prefixes", default="2019-ETI-EMON-V01")
-    parser.add_argument("--no-crc-check", action="store_true")
+    parser.add_argument(
+        "--strict-crc", action="store_true", help="reject telegrams with a wrong CRC"
+    )
     args = parser.parse_args(argv)
 
     zone = ZoneInfo(args.log_timezone)
     reporter = ErrorReporter(quarantine_file=None, limit_per_hour=0)
     pipeline = Pipeline(
         DecoderRegistry(args.prefixes.split(",")),
-        TelegramParser(require_valid_crc=not args.no_crc_check),
+        TelegramParser(require_valid_crc=args.strict_crc),
         PointBuilder("dsmr"),
         reporter,
     )
@@ -140,7 +151,9 @@ def main(argv: list[str] | None = None) -> int:
     print("\nkits with differences other than gas 0 → absent:")
     for sig, kit in sorted(kits.items(), key=lambda kv: kv[1].meter):
         notable = {
-            k: v for k, v in kit.outcomes.items() if k not in ("identical", "gas 0 → absent")
+            k: v
+            for k, v in kit.outcomes.items()
+            if k not in ("identical", "gas 0 → absent", "written with crc_valid=false")
         }
         if notable:
             print(f"  {mask(sig)}  meter={kit.meter} version={kit.version}  {notable}")
