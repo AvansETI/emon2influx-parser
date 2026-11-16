@@ -70,6 +70,8 @@ UTF-8 JSON:
 }
 ```
 
+- This is the format of the V01 kits. V02 kits (`2026-MNEXT-EMON-V02`) will send a different
+  payload, not yet known (§3.4).
 - `s0` and `s1` (pulse inputs) are ignored.
 - Messages that are not a JSON object with `datagram.p1` and `datagram.signature` are rejected. This covers the bare `1` and the "hello" message.
 
@@ -79,7 +81,15 @@ UTF-8 JSON:
   `SIGNATURE_PREFIXES`.
 - Anything else is rejected and never reaches InfluxDB. This prevents line-protocol injection and stray series.
 
-### 3.3 Telegram
+### 3.3 Payload formats per kit generation
+
+- **One decoder per payload format.** Each decoder turns its format into the same
+  `Payload(signature, p1, received_at)`. The parser and everything after it do not depend on the kit generation.
+- **A decoder registry maps signature prefixes to decoders.** It starts with `2019-ETI-EMON-V01` → `EmonV1Decoder`.
+- **V02 is added once its format is known.** That means one new decoder class, its fixtures, and a registry entry.
+- **Until then V02 messages are rejected** with category `payload_unsupported`. They are counted and quarantined, so the first real V02 messages are available as examples.
+
+### 3.4 Telegram
 
 - It starts at `/`, followed by the identification line, and ends at `!`, followed by an optional CRC16.
 - **CRC:** with `REQUIRE_VALID_CRC=true` a telegram with a CRC that does not match is rejected. The CRC is CRC-16/ARC over `/` up to and including `!`.
@@ -140,7 +150,28 @@ The identification line is not stored as a whole. In some meters it contains the
 When a telegram has no device type (old meters), a reading in m³ is taken as gas. Equipment
 identifiers of M-Bus devices (`0-n:96.1.0`) are never read.
 
-### 4.3 Never stored
+### 4.3 Tracing a field back to DSMR
+
+Every field can be traced back to the OBIS code it came from.
+
+- **One registry entry per field** (`telegram/registry.py`), with:
+  - the OBIS code or codes;
+  - the description from the DSMR specification;
+  - the unit in the telegram and the stored unit;
+  - the conversion (e.g. W → kW);
+  - the meter generations or countries where it occurs.
+- **Derived fields name their sources:**
+  - `energy_consumed` = `1-0:1.8.1` + `1-0:1.8.2`, or `1-0:1.8.0`;
+  - `clock_offset_s` = receipt time − `0-0:1.0.0`;
+  - `meter_manufacturer` comes from the identification line.
+- **Generated from the registry** by `python -m emon2influx.tools.fields`:
+  - `doc/fields.md`, to read;
+  - `doc/fields.json`, for scripts and Grafana.
+
+  A test fails when either differs from the registry, so they cannot drift.
+- **Optional:** a measurement `dsmr_fields` in the same bucket, with tag `field` and fields `obis`, `description`, `unit`, `derived_from`. It is written at start-up when the registry changed (§13).
+
+### 4.4 Never stored
 
 The following are never stored:
 
@@ -184,11 +215,11 @@ Python 3.12 package `emon2influx`. Dependencies: `paho-mqtt` 2.x, `influxdb-clie
 | -------------------------- | ---------------------------------------------------------------------------- |
 | `config.py`                | `Settings`: reads and validates the environment (`.env`); fails fast with a clear message |
 | `source/mqtt.py`           | `MqttSource`: paho 2.x client, subscribes in `on_connect`, automatic reconnect, puts raw payloads with their receipt time on a bounded queue |
-| `payload.py`               | `PayloadDecoder` → `Payload(signature, p1, received_at)`; validates JSON shape and `Signature` |
+| `payload/`                 | `PayloadDecoder` interface → `Payload(signature, p1, received_at)`; `EmonV1Decoder`; `DecoderRegistry` (prefix → decoder, §3.3) |
 | `signature.py`             | `Signature`: validation against the allowed prefixes; `masked()` for logs     |
 | `telegram/frame.py`        | `TelegramFrame`: splits header, lines and CRC; `crc16()`                     |
 | `telegram/obis.py`         | `ObisLine` (code, values, units) and the lexer for all line forms, including the multi-line DSMR 2.2 gas reading |
-| `telegram/registry.py`     | `FieldSpec` and the `REGISTRY`: OBIS code → field, unit, type and conversion. Adding a field is one entry |
+| `telegram/registry.py`     | `FieldSpec` and the `REGISTRY`: OBIS code → field, unit, type, conversion and description. Adding a field is one entry. The single source for §4.3 |
 | `telegram/parser.py`       | `TelegramParser` → `Reading(electricity: dict, mbus: list[MbusReading], meter: MeterInfo, meter_time)`; collects `FieldIssue`s instead of failing on one bad line |
 | `telegram/mbus.py`         | `MbusChannel`: groups `0-n:` lines per channel and maps device types         |
 | `points.py`                | `PointBuilder`: `Reading` → InfluxDB points (escaping by the client library) |
@@ -225,6 +256,7 @@ Limit: messages that never arrive are lost. That happens when the parser itself 
 | ----------------- | ------------------------------------ | ------------------------------ |
 | `payload_json`    | corrupt bytes, invalid UTF-8         | message rejected               |
 | `payload_shape`   | `1`, missing `datagram.p1`           | message rejected (logged at DEBUG; expected noise) |
+| `payload_unsupported` | prefix without a decoder (V02 for now) | message rejected and quarantined |
 | `signature`       | wrong prefix or format               | message rejected               |
 | `crc`             | CRC mismatch                         | message rejected               |
 | `telegram`        | no `/` or `!`, truncated             | message rejected               |
@@ -324,7 +356,8 @@ These are not part of this project; they are listed here so they can be planned:
 
 | #   | Topic                       | Proposal                                                                   |
 | --- | --------------------------- | -------------------------------------------------------------------------- |
-| 1   | V02 kits payload            | Assumed identical to V01; to be confirmed.                                 |
+| 1   | V02 kits payload            | Different from V01, not yet known. A decoder is added when it is (§3.3). |
+| 5   | Field map in InfluxDB       | `dsmr_fields` measurement next to the docs (§4.3): yes or no.             |
 | 2   | Approximated cos φ          | Not stored (not in DSMR; P/(U×I) is inaccurate with whole amperes).        |
 | 3   | GitHub repository           | Local only for now; AvansETI later after approval.                         |
 | 4   | InfluxDB host for the test  | Old config uses `192.168.5.31`, the app uses `192.168.5.30`; to be confirmed. |
