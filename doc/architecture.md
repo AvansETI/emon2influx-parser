@@ -36,7 +36,7 @@ Out of scope:
 ## 2. Context
 
 ```
- EMON kit ──MQTT (QoS 0)──▶ broker 10.0.0.31 ──MQTT──▶ emon2influx-parser ──HTTP──▶ InfluxDB
+ EMON kit ──MQTT (QoS 0)──▶ broker (internal) ──MQTT─▶ emon2influx-parser ──HTTP──▶ InfluxDB
  (P1 port)   topic smartmeter/raw                     (this project)               bucket p1-smartmeters
                                                                                    measurement dsmr
                                                                        read by ──▶ p1-meter-app
@@ -540,16 +540,84 @@ No other field is touched.
 2. The history up to the switch is corrected.
 3. The app keeps its orientation detection as a safety net.
 
-**Not correctable: the zeros for missing gas.** InfluxDB 2 can only delete whole points, by
-tag and time, not a single field. The `gas_delivered=0` values written for households
-without gas therefore stay in history; only new data omits them.
+**Usage** (`python -m emon2influx.tools.fix_orientation`):
 
-## 14. Open questions
+| Command | What it does | Writes |
+| --- | --- | --- |
+| `plan --env F --until T` | votes per day per household and lists the swapped periods before `T`, plus segments to review; writes `plan.json` | no |
+| `apply --env F --plan plan.json --yes` | backup, swap from the backup, record in `dsmr_corrections`, verify | yes |
+| `verify --env F --plan plan.json` | the votes per period now | no |
+| `restore --env F --backup FILE --yes` | writes the original values back and records the restore | yes |
+| `copy --source-env F --env F --signature S --from A --until B` | copies a household's history into a test bucket for a rehearsal | test bucket only |
 
-| #   | Topic                       | Proposal                                                                   |
-| --- | --------------------------- | -------------------------------------------------------------------------- |
-| 1   | V02 kits payload            | Different from V01, not yet known. A decoder is added when it is (§3.3). |
-| 5   | Field map in InfluxDB       | Yes: `dsmr_fields` measurement next to the docs (§4.3). Decided 2026-11-16. |
-| 2   | Approximated cos φ          | Not stored (not in DSMR; P/(U×I) is inaccurate with whole amperes).        |
-| 3   | GitHub repository           | Local only for now; AvansETI later after approval.                         |
-| 4   | InfluxDB host               | Dev server: `https://influxdb.sendlab.nl`; production: the local IP address. Decided 2026-11-16. |
+`--env F` is a file with `INFLUX_URL`, `INFLUX_ORG`, `INFLUX_BUCKET` and `INFLUX_TOKEN`. Writing to `p1-smartmeters` also needs `--allow-production`. `plan.json` and the backups contain full signatures and stay private (git-ignored).
+
+**Implementation details:**
+
+- **Daily statistics** are queried in blocks of 60 days. Years in one query exceed the reverse proxy's time-out. On the LXC, which reaches InfluxDB directly, a full plan is faster than through the proxy (about one minute per household with years of data).
+- **The swap is computed from the backup**, not from the live data. An interrupted run that is started again writes the same values again; nothing is swapped back.
+- **Stricter than the app's rule:**
+  - only days with a margin of at least 0.2 kWh between the two counters vote;
+  - gaps take the orientation of their neighbours only when both agree;
+  - a swapped segment needs at least 3 clear days and an agreement of 80 %;
+  - a short contradicting run between two equal neighbours is treated as noise.
+
+**Rehearsal on 2026-11-16.** One week of a known swapped household was copied into the test bucket. Then:
+
+1. `plan` found one period (6 clear days, 100 % agreement).
+2. `apply` swapped 18,860 points; verify then voted as-named on all clear days.
+3. A second `plan` found nothing.
+4. A second `apply` skipped the period.
+5. `restore` brought back the original values, and verify voted swapped again.
+
+A read-only `plan` on `p1-smartmeters` for the same household found one period of 972 days (931 clear days, 100 % agreement).
+
+### 13.1 Removing the zeros of households without a gas meter
+
+- Status: **approved** (2026-11-16)
+
+The old parser wrote `gas_delivered=0` when the telegram had no gas reading. A gas meter reports a rising reading, never 0. So a household whose gas was **0 in every point**, up to now, has no gas meter, and the new parser writes no gas for it at all.
+
+**Why the maximum, not the last value.** Checking only the last value is not enough, for two reasons:
+- the old parser also wrote 0 when it could not read the gas line, so a household with a gas meter has occasional zeros between real readings;
+- a kit can move to another meter.
+
+The plan therefore uses the maximum over the whole lifetime.
+
+**Feed-in is not cleaned.** Telegrams always contain `2.8.x` and `2.7.0`, so a 0 there is a real reading, and the new parser keeps writing it.
+
+**How.** InfluxDB 2.7 refuses to delete one field ("delete by field is not supported", tested 2026-11-16). `python -m emon2influx.tools.drop_zero_gas` therefore rewrites each affected household day by day:
+
+1. back up all points of the day (gzipped line protocol, all fields and types);
+2. delete the day (by signature and time, which InfluxDB supports);
+3. write the points back without `gas_delivered`;
+4. check that the number of points matches and no gas is left.
+
+**Safety.**
+- `plan` is read-only: households with gas points whose maximum is 0.
+- During `apply`, each day's values are checked again. One gas value other than 0 stops that household. This costs nothing extra: the values are loaded for the backup anyway.
+- The rewrite comes from the backup. An interrupted run resumes; finished days are skipped.
+- `restore` writes a household's backups back as they were.
+- The period of the new parser (from `--until`) is never touched.
+- `dsmr_corrections` records `gas_zero_removed` and `gas_zero_restored`.
+- Writing to `p1-smartmeters` needs `--yes` and `--allow-production`.
+
+**Rehearsal on 2026-11-16.** Three days of a household without a gas meter were copied into the test bucket: 8,918 points per field, gas all 0. Then:
+
+1. `plan` found that household only.
+2. `apply` rewrote 3 days and removed 8,918 gas points; the four other fields kept all 8,918 points.
+3. A second `apply` did nothing.
+4. `restore` brought gas back to 8,918 points.
+
+## 14. Open questions and decisions
+
+| #   | Topic                 | Status                                                                                          |
+| --- | --------------------- | ----------------------------------------------------------------------------------------------- |
+| 1   | V02 kits payload      | **Open.** Different from V01, not yet known. A decoder is added when it is (§3.3).                |
+| 2   | Approximated cos φ    | **Not done** (decided 2026-11-16). Not in DSMR; P/(U×I) is inaccurate with whole amperes.         |
+| 3   | GitHub repository     | **Done** (2026-11-16). Public repository under AvansETI; releases feed the updater (§11.1).      |
+| 4   | InfluxDB host         | **Done** (2026-11-16). Dev server: the public URL; production: the local address. Both are set in the env file only, never in the repository. |
+| 5   | Field map in InfluxDB | **Done** (2026-11-16). `dsmr_fields` measurement next to the docs (§4.3).                         |
+
+Host names, addresses and tokens belong in the env file. Documentation uses placeholders such
+as `influxdb.example.org` and `192.0.2.10`.
