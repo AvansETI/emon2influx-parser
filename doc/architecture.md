@@ -36,7 +36,7 @@ Out of scope:
 ## 2. Context
 
 ```
- EMON kit ──MQTT (QoS 0)──▶ broker 10.0.0.31 ──MQTT──▶ emon2influx-parser ──HTTP──▶ InfluxDB
+ EMON kit ──MQTT (QoS 0)──▶ broker (internal) ──MQTT─▶ emon2influx-parser ──HTTP──▶ InfluxDB
  (P1 port)   topic smartmeter/raw                     (this project)               bucket p1-smartmeters
                                                                                    measurement dsmr
                                                                        read by ──▶ p1-meter-app
@@ -609,12 +609,15 @@ The plan therefore uses the maximum over the whole lifetime.
 3. A second `apply` did nothing.
 4. `restore` brought gas back to 8,918 points.
 
-## 14. Open questions
+## 14. Open questions and decisions
 
-| #   | Topic                       | Proposal                                                                   |
-| --- | --------------------------- | -------------------------------------------------------------------------- |
-| 1   | V02 kits payload            | Different from V01, not yet known. A decoder is added when it is (§3.3). |
-| 5   | Field map in InfluxDB       | Yes: `dsmr_fields` measurement next to the docs (§4.3). Decided 2026-11-16. |
-| 2   | Approximated cos φ          | Not stored (not in DSMR; P/(U×I) is inaccurate with whole amperes).        |
-| 3   | GitHub repository           | Local only for now; AvansETI later after approval.                         |
-| 4   | InfluxDB host               | Dev server: `https://influxdb.sendlab.nl`; production: the local IP address. Decided 2026-11-16. |
+| #   | Topic                 | Status                                                                                          |
+| --- | --------------------- | ----------------------------------------------------------------------------------------------- |
+| 1   | V02 kits payload      | **Open.** Different from V01, not yet known. A decoder is added when it is (§3.3).                |
+| 2   | Approximated cos φ    | **Not done** (decided 2026-11-16). Not in DSMR; P/(U×I) is inaccurate with whole amperes.         |
+| 3   | GitHub repository     | **Done** (2026-11-16). Public repository under AvansETI; releases feed the updater (§11.1).      |
+| 4   | InfluxDB host         | **Done** (2026-11-16). Dev server: the public URL; production: the local address. Both are set in the env file only, never in the repository. |
+| 5   | Field map in InfluxDB | **Done** (2026-11-16). `dsmr_fields` measurement next to the docs (§4.3).                         |
+
+Host names, addresses and tokens belong in the env file. Documentation uses placeholders such
+as `influxdb.example.org` and `192.0.2.10`.
