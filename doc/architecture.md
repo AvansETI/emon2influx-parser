@@ -385,7 +385,7 @@ Only after these steps is switching production discussed.
 ## 11. Deployment
 
 - **systemd service** `emon2influx-parser.service`:
-  - runs `python -m emon2influx` in a venv;
+  - runs `/opt/emon2influx-parser/current/venv/bin/python -m emon2influx` (the release the updater installed, §11.1);
   - `EnvironmentFile=/etc/emon2influx-parser/env` (mode 600);
   - `StateDirectory` for the spool, `LogsDirectory` for logs;
   - `Restart=always`;
@@ -398,7 +398,7 @@ Only after these steps is switching production discussed.
 
 ### 11.1 Automatic updates
 
-- Status: **draft**, awaiting approval (2026-11-16)
+- Status: **approved** (2026-11-16)
 
 The LXC cannot be reached from the internet, so it fetches new versions itself (pull), like the
 p1-meter-app (its deployment design). A merge into `main` reaches the LXC without manual steps.

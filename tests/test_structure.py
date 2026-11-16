@@ -77,7 +77,7 @@ def test_errors_go_to_the_error_log_only(
 
 
 def test_worker_runs_messages_through_to_the_sink(tmp_path: Path) -> None:
-    c = build(settings(tmp_path), writer=DryRunWriter())
+    c = build(settings(tmp_path, HEALTH_FILE=""), writer=DryRunWriter())
     received = datetime(2026, 11, 16, 17, 10, 30, tzinfo=UTC)
     c.messages.put((payload(with_crc(DSMR50_LINES)), received))
     c.messages.put((b"1", received))
@@ -87,3 +87,47 @@ def test_worker_runs_messages_through_to_the_sink(tmp_path: Path) -> None:
     line = SummaryReporter(c.metrics, c.spool).report()
     assert "messages=2 kits=1 points=2 rejected=1 written=2" in line
     assert c.field_map is None  # dry-run never writes dsmr_fields
+
+
+def test_health_file_reports_status(tmp_path: Path) -> None:
+    import json
+
+    c = build(settings(tmp_path, HEALTH_FILE=str(tmp_path / "health.json")), writer=DryRunWriter())
+    assert c.health is not None
+    c.messages.put((payload(with_crc(DSMR50_LINES)), datetime(2026, 11, 16, tzinfo=UTC)))
+    Worker(c.messages, c.pipeline, c.sink, c.summary, c.health).drain()
+    c.sink.tick()
+    c.health.write()
+    status = json.loads((tmp_path / "health.json").read_text())
+    assert status["messages"] == 1
+    assert status["mqtt_connected"] is False
+    assert status["last_written_at"] is not None
+    assert status["spool_files"] == 0
+    assert not (tmp_path / "health.json.tmp").exists()
+
+
+def test_totals_survive_a_summary() -> None:
+    metrics = Metrics()
+    metrics.incr("messages", 2)
+    metrics.snapshot(reset=True)
+    metrics.incr("messages")
+    assert metrics.total("messages") == 3
+
+
+def test_cli_check_config_and_version(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from emon2influx import __version__
+    from emon2influx.__main__ import main
+
+    assert main(["--version"]) == 0
+    assert capsys.readouterr().out.strip().startswith(__version__)
+    env = tmp_path / "env"
+    env.write_text("MQTT_HOST=broker.example\nMODE=write\n")
+    for key in ("MQTT_HOST", "MODE", "INFLUX_URL", "INFLUX_ORG", "INFLUX_BUCKET", "INFLUX_TOKEN"):
+        monkeypatch.delenv(key, raising=False)
+    assert main(["--check-config", "--env-file", str(env)]) == 2
+    assert "INFLUX_TOKEN is required" in capsys.readouterr().err
+    env.write_text("MQTT_HOST=broker.example\n")
+    monkeypatch.delenv("MODE", raising=False)
+    assert main(["--check-config", "--env-file", str(env)]) == 0

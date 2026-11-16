@@ -22,3 +22,6 @@ dist/
 .coverage
 htmlcov/
 run/
+
+# Written by CI
+src/emon2influx/build.json

@@ -7,7 +7,7 @@ import threading
 from datetime import UTC, datetime
 from types import FrameType
 
-from . import __version__
+from . import build_version
 from .config import Settings
 from .container import Components, build
 from .logging_setup import setup_logging
@@ -20,7 +20,11 @@ class App:
     def __init__(self, components: Components) -> None:
         self.c = components
         self.worker = Worker(
-            components.messages, components.pipeline, components.sink, components.summary
+            components.messages,
+            components.pipeline,
+            components.sink,
+            components.summary,
+            components.health,
         )
         self.stop = threading.Event()
 
@@ -28,7 +32,7 @@ class App:
         s = self.c.settings
         log.info(
             "emon2influx-parser %s starting: mode=%s bucket=%s measurement=%s prefixes=%s",
-            __version__,
+            build_version(),
             s.mode,
             s.influx_bucket or "-",
             s.influx_measurement,

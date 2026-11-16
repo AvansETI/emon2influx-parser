@@ -1,0 +1,12 @@
+# Checks for a new release every minute. It reads the release download link, not the GitHub API,
+# so it stays clear of the API's rate limit (doc/architecture.md §11.1).
+[Unit]
+Description=emon2influx-parser: check for a new release every minute
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

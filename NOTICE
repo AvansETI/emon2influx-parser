@@ -1,0 +1,32 @@
+emon2influx-parser
+Copyright 2026 Arno Broeders
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+It parses P1 smart-meter telegrams from the EMON kits of the SmartMeter DIY project of
+the Lectoraat Smart Energy (MNEXT, Avans Hogeschool and HZ University of Applied Sciences)
+and writes them to InfluxDB.
+
+When you redistribute this software or a derivative work, keep this NOTICE file and
+credit the author as required by section 4(d) of the Apache License.
+
+Trademarks
+----------
+The MNEXT, Avans and HZ names are trademarks of their respective owners. They are NOT
+licensed under the Apache License (see section 6).
+
+Third-party software
+--------------------
+The release packages include these open-source packages, each under its own license:
+
+  paho-mqtt          EPL-2.0 OR BSD-3-Clause (used under BSD-3-Clause)
+  influxdb-client    MIT
+  reactivex          MIT
+  urllib3            MIT
+  python-dateutil    BSD-3-Clause
+  python-dotenv      BSD-3-Clause
+  certifi            MPL-2.0 (unmodified)
+  typing_extensions  PSF-2.0
+  tzdata             Apache-2.0
+
+Their license texts are included in the wheel files of each release package.

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=69"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,6 +7,9 @@ name = "emon2influx-parser"
 version = "0.1.0"
 description = "Parses P1 telegrams from EMON kits (MQTT) and writes them to InfluxDB"
 readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "Arno Broeders" }]
 requires-python = ">=3.12"
 dependencies = [
   "paho-mqtt>=2.1,<3",
@@ -16,13 +19,17 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.11"]
+dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.11", "shellcheck-py>=0.10"]
 
 [project.scripts]
 emon2influx-parser = "emon2influx.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+# Written by CI with the git commit (doc/architecture.md §11.1); absent in development.
+emon2influx = ["build.json"]
 
 [tool.ruff]
 line-length = 100

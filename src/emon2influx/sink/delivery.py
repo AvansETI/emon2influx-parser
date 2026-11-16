@@ -1,5 +1,6 @@
 """One attempt to write a batch, with its outcome counted and rejected data quarantined."""
 
+from datetime import UTC, datetime
 from enum import Enum
 
 from ..diagnostics import ErrorEvent, ErrorReporter
@@ -20,6 +21,7 @@ class Delivery:
         self.metrics = metrics
         self.reporter = reporter
         self.last_error: WriteError | None = None
+        self.last_written_at: datetime | None = None
 
     def send(self, batch: list[str]) -> Outcome:
         try:
@@ -34,4 +36,5 @@ class Delivery:
             self.reporter.report(event, raw="\n".join(batch), quarantine=True, count=len(batch))
             return Outcome.REJECTED
         self.metrics.incr("written", len(batch))
+        self.last_written_at = datetime.now(UTC)
         return Outcome.WRITTEN
