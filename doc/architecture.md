@@ -207,32 +207,70 @@ The following are never stored:
 Python 3.12 package `emon2influx`. Dependencies: `paho-mqtt` 2.x, `influxdb-client`,
 `python-dotenv`. All are permissively licensed.
 
+Each class has one responsibility; collaborators are passed in through the constructor
+(dependency injection), and only `container.py` knows which concrete classes are used. The
+class diagrams are in [class-diagram.md](class-diagram.md).
+
 ```
- MqttSource ──bytes──▶ queue ──▶ Pipeline ──▶ PayloadDecoder ──▶ TelegramParser ──▶ PointBuilder ──▶ InfluxSink
- (paho thread)        (bounded)  (worker)        │                    │                                 │
-                                                 └──── errors ───────▶ ErrorReporter ◀── write errors ──┤
-                                                                       (error log, quarantine,          ▼
-                                                                        hourly summary)              DiskSpool
+ MqttSource ──bytes──▶ queue ──▶ Worker ──▶ Pipeline ──▶ DecoderRegistry ──▶ TelegramParser ──▶ PointBuilder
+ (paho thread)        (bounded)  (worker      │                                                     │
+                                  thread)     ▼                                                     ▼
+                               ErrorReporter ──▶ ErrorLog, QuarantineStore              InfluxSink ──▶ Delivery ──▶ Writer
+                                     │            (RateLimiter)                         (sink thread)   BackoffPolicy
+                                     ▼                                                                  SpoolReplayer ──▶ DiskSpool
+                                  Metrics ◀──────────────── every component counts here ──────────────────────┘
+                                     │
+                                     ▼
+                              SummaryReporter (hourly line in the main log)
 ```
 
-| Module                     | Class / role                                                                 |
-| -------------------------- | ---------------------------------------------------------------------------- |
-| `config.py`                | `Settings`: reads and validates the environment (`.env`); fails fast with a clear message |
-| `source/mqtt.py`           | `MqttSource`: paho 2.x client, subscribes in `on_connect`, automatic reconnect, puts raw payloads with their receipt time on a bounded queue |
-| `payload/`                 | `PayloadDecoder` interface → `Payload(signature, p1, received_at)`; `EmonV1Decoder`; `DecoderRegistry` (prefix → decoder, §3.3) |
-| `signature.py`             | `Signature`: validation against the allowed prefixes; `masked()` for logs     |
-| `telegram/frame.py`        | `TelegramFrame`: splits header, lines and CRC; `crc16()`                     |
-| `telegram/obis.py`         | `ObisLine` (code, values, units) and the lexer for all line forms, including the multi-line DSMR 2.2 gas reading |
-| `telegram/registry.py`     | `FieldSpec` and the `REGISTRY`: OBIS code → field, unit, type, conversion and description. Adding a field is one entry. The single source for §4.3 |
-| `telegram/parser.py`       | `TelegramParser` → `Reading(electricity: dict, mbus: list[MbusReading], meter: MeterInfo, meter_time)`; collects `FieldIssue`s instead of failing on one bad line |
-| `telegram/mbus.py`         | `MbusChannel`: groups `0-n:` lines per channel and maps device types         |
-| `points.py`                | `PointBuilder`: `Reading` → InfluxDB points (escaping by the client library) |
-| `sink/influx.py`           | `InfluxSink`: batching, retry with backoff, hands failed batches to the spool |
-| `sink/spool.py`            | `DiskSpool`: write-ahead files in line protocol, replay oldest first, size cap |
-| `diagnostics.py`           | `ErrorReporter`: error log, quarantine file, rate limiting, hourly summary, counters |
-| `app.py`, `__main__.py`    | wiring, `MODE` (write or dry-run), signal handling (SIGTERM, SIGINT), clean shutdown with a final flush |
-| `tools/replay.py`          | replays an old `emon2influx.log` through the new parser and compares with the old InfluxDB lines (§10) |
-| `tools/fix_orientation.py` | one-off correction of swapped counters in history (§13) |
+| Module                    | Class: responsibility |
+| ------------------------- | --------------------- |
+| `config.py`               | `Settings`: reads and validates the environment; fails fast with every problem listed |
+| `container.py`            | `build()`: creates and connects all components (factory); the only place that picks concrete classes |
+| `app.py`, `__main__.py`   | `App`: lifecycle order (start, run, stop) and signals (SIGTERM, SIGINT) |
+| `worker.py`               | `Worker`: the processing loop; takes messages off the queue and hands points to the sink |
+| `logging_setup.py`        | `setup_logging()`: where log records go (§8) |
+| `metrics.py`              | `Metrics`: all counters, thread-safe; `snapshot(reset)` |
+| `summary.py`              | `SummaryReporter`: the hourly summary line |
+| `source/mqtt.py`          | `MqttSource`: paho 2.x client, subscribes in `on_connect`, reconnects, queues raw payloads with their receipt time |
+| `payload/`                | `PayloadDecoder` (strategy) with `EmonV1Decoder`; `DecoderRegistry`: prefix → decoder (§3.3) |
+| `signature.py`            | `Signature`: validation against the allowed prefixes; masking for logs |
+| `pipeline.py`             | `Pipeline`: decode → parse → build points; reports problems |
+| `telegram/frame.py`       | `TelegramFrame`: outer structure and CRC |
+| `telegram/obis.py`        | `ObisLine`, `ObisValue` and the line lexer, including the multi-line DSMR 2.2 gas reading |
+| `telegram/lines.py`       | `LineIndex`: sorts lines into electricity lines and M-Bus channels |
+| `telegram/registry.py`    | `FieldSpec`, `DerivedSpec`, `MbusSpec`: OBIS code → field, unit, type, description. Single source for §4.3 |
+| `telegram/electricity.py` | `ElectricityMapper`: registered electricity fields with unit conversion |
+| `telegram/derived.py`     | one function per derived field (`DERIVERS`); a test checks they match the registry |
+| `telegram/mbus.py`        | `MbusChannel`: one channel's device type and readings; `MbusMapper`: readings at their capture time |
+| `telegram/parser.py`      | `TelegramParser`: coordinates the above into a `Reading` |
+| `telegram/model.py`       | `Reading`, `MbusReading`, `FieldIssue` |
+| `points.py`               | `PointBuilder`: `Reading` → line protocol |
+| `fieldmap.py`             | `FieldMapPublisher`: writes `dsmr_fields` once per registry version |
+| `diagnostics/`            | `ErrorReporter` (façade), `RateLimiter`, `ErrorLog`, `QuarantineStore`, `ErrorEvent` |
+| `sink/writer.py`          | `Writer` protocol, `InfluxWriter`, `DryRunWriter` (null object), `WriteError` |
+| `sink/delivery.py`        | `Delivery`: one write attempt and its outcome (written, retry, rejected) |
+| `sink/backoff.py`         | `BackoffPolicy`: when to try again (1 s … 5 min) |
+| `sink/replay.py`          | `SpoolReplayer`: sends spooled batches oldest first |
+| `sink/spool.py`           | `DiskSpool`: write-ahead files in line protocol, size cap |
+| `sink/sink.py`            | `InfluxSink`: batching and coordination of the above |
+| `tools/`                  | `fields`, `replay`, `compare_buckets`, `fix_orientation` (§10, §13) |
+
+**Design patterns.**
+
+| Pattern | Where |
+| --- | --- |
+| Strategy | `PayloadDecoder` implementations; `Writer` implementations; one derive function per derived field |
+| Null object | `DryRunWriter` |
+| Registry / table-driven | `DecoderRegistry`; the OBIS field registry instead of a parser per DSMR version |
+| Façade | `ErrorReporter` over rate limiting, error log and quarantine |
+| Factory | `container.build()`; named constructors such as `Settings.from_env`, `Signature.parse` |
+| Pipeline | `Pipeline` |
+| Producer-consumer | the bounded queue between the MQTT thread and the worker |
+| Store-and-forward | `DiskSpool` and `SpoolReplayer` |
+| Retry with exponential backoff | `BackoffPolicy` |
+| Value object | frozen dataclasses (`Payload`, `ObisLine`, `MbusReading`, `FieldSpec`, `ErrorEvent`) |
 
 **Threads.**
 - **paho network thread:** only puts payloads on the queue, so it never blocks.
@@ -270,7 +308,17 @@ Limit: messages that never arrive are lost. That happens when the parser itself 
 | `influx_rejected` | 4xx from InfluxDB                    | batch quarantined              |
 | `spool_dropped`   | spool full                           | oldest points dropped          |
 
-**Error log** (`logs/errors.log`, rotated hourly). One record per error:
+**Where logs go** (`logging_setup.py`). Each record has one destination, so nothing is logged twice:
+
+| Logger | Content | Destination |
+| ------ | ------- | ----------- |
+| `emon2influx` | start, stop, outages, hourly summary | console (stderr, collected by journald) and `LOG_DIR/emon2influx-parser.log` |
+| `emon2influx.errors` | problems per message | `LOG_DIR/errors.log` only; on the console only when `LOG_DIR` is empty |
+| – | rejected messages | `QUARANTINE_FILE` |
+
+All files rotate hourly; `LOG_KEEP` files are kept.
+
+**Error log** (`logs/errors.log`). One record per error:
 - time;
 - category;
 - signature;
@@ -342,7 +390,7 @@ Only after these steps is switching production discussed.
   - `StateDirectory` for the spool, `LogsDirectory` for logs;
   - `Restart=always`;
   - hardening options.
-- **Docker:** a `Dockerfile` as an alternative.
+- **Target:** directly on an LXC container; no container images (decided 2026-11-16).
 - **Switching over.**
   - Old and new parser can run side by side, each with its own client id.
   - Only one may write to `p1-smartmeters`.

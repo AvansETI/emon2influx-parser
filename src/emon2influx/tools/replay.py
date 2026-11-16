@@ -17,6 +17,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from ..diagnostics import ErrorReporter
+from ..metrics import Metrics
 from ..payload.registry import DecoderRegistry
 from ..pipeline import Pipeline
 from ..points import PointBuilder
@@ -95,12 +96,14 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     zone = ZoneInfo(args.log_timezone)
-    reporter = ErrorReporter(quarantine_file=None, limit_per_hour=0)
+    metrics = Metrics()
+    reporter = ErrorReporter.create(metrics, limit_per_hour=0, quarantine_file=None)
     pipeline = Pipeline(
         DecoderRegistry(args.prefixes.split(",")),
         TelegramParser(require_valid_crc=args.strict_crc),
         PointBuilder("dsmr"),
         reporter,
+        metrics,
     )
     kits: dict[str, Kit] = defaultdict(Kit)
     totals: Counter[str] = Counter()
@@ -139,12 +142,13 @@ def main(argv: list[str] | None = None) -> int:
                         totals[outcome] += 1
                         kits[old.group(1)].outcomes[outcome] += 1
 
+    snap = metrics.snapshot()
     print(
-        f"messages: {pipeline.stats['messages']}  kits: {len(kits)}  "
-        f"new points: {pipeline.stats['points']}  new rejected: {pipeline.stats['rejected']}"
+        f"messages: {snap.counters['messages']}  kits: {len(kits)}  "
+        f"new points: {snap.counters['points']}  new rejected: {snap.counters['rejected']}"
     )
-    print("new errors by category:", dict(reporter.take_counts()))
-    print("unknown OBIS codes:", dict(pipeline.unknown_codes.most_common(10)))
+    print("new errors by category:", dict(snap.errors))
+    print("unknown OBIS codes:", dict(snap.unknown_codes.most_common(10)))
     print("\noutcomes:")
     for outcome, count in totals.most_common():
         print(f"  {count:7d}  {outcome}")

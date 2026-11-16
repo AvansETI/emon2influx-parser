@@ -43,7 +43,7 @@ ignore_missing_imports = true
 
 # influxdb-client ships partial annotations.
 [[tool.mypy.overrides]]
-module = ["emon2influx.points", "emon2influx.fieldmap", "emon2influx.sink.influx"]
+module = ["emon2influx.points", "emon2influx.fieldmap", "emon2influx.sink.writer"]
 disallow_untyped_calls = false
 
 [tool.pytest.ini_options]
