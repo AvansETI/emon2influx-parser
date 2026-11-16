@@ -3,7 +3,7 @@
 Receives P1 smart-meter telegrams that EMON kits publish over MQTT, parses them and writes the
 readings to InfluxDB. Successor of the original `emon2influx` script.
 
-- Architecture and design: [doc/architecture.md](doc/architecture.md)
+- Architecture and design: [doc/architecture.md](doc/architecture.md); classes: [doc/class-diagram.md](doc/class-diagram.md)
 - Every stored field and its DSMR/OBIS origin: [doc/fields.md](doc/fields.md)
 
 ## Development
