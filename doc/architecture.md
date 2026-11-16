@@ -31,7 +31,7 @@ Out of scope:
 
 - Changes to the kit firmware or the MQTT broker.
 - Changes to the p1-meter-app. Consequences for the app are listed in §12.
-- Rewriting historical data in InfluxDB.
+- Rewriting historical data in InfluxDB, except the one-off counter correction (§13).
 
 ## 2. Context
 
@@ -228,6 +228,7 @@ Python 3.12 package `emon2influx`. Dependencies: `paho-mqtt` 2.x, `influxdb-clie
 | `diagnostics.py`           | `ErrorReporter`: error log, quarantine file, rate limiting, hourly summary, counters |
 | `app.py`, `__main__.py`    | wiring, `MODE` (write or dry-run), signal handling (SIGTERM, SIGINT), clean shutdown with a final flush |
 | `tools/replay.py`          | replays an old `emon2influx.log` through the new parser and compares with the old InfluxDB lines (§10) |
+| `tools/fix_orientation.py` | one-off correction of swapped counters in history (§13) |
 
 **Threads.**
 - **paho network thread:** only puts payloads on the queue, so it never blocks.
@@ -347,12 +348,51 @@ Only after these steps is switching production discussed.
 
 These are not part of this project; they are listed here so they can be planned:
 
-- **Swapped counters.** Detection must stay, because history keeps the swapped data. After the switch, new data from the affected kits is correct. A household may then flip orientation at the switch date.
+- **Swapped counters.** New data is correct from the switch on; history is corrected afterwards (§13). Until then a household may flip orientation at the switch date. The app's detection stays as a safety net.
 - **Missing gas.** Households without gas get no `gas_delivered` at all instead of 0. The rule "gas only if `max > 0`" keeps working.
 - **Gas at its capture time.** The app shifts hourly gas back by one hour (gas analysis §3.6). For data written by the new parser that shift must not be applied, or it will be double.
 - **New fields** (voltage, current, per phase) can be used later.
 
-## 13. Open questions
+## 13. Correcting swapped counters in history
+
+The old parser wrote import as `energy_produced` and export as `energy_consumed` for telegrams
+without a version line (§1). A separate tool, `python -m emon2influx.tools.fix_orientation`,
+corrects that history once the new parser is live.
+
+**How InfluxDB is changed.** InfluxDB cannot change a field in place. A point written with the
+same measurement, tag set and timestamp overwrites the fields it contains, so the tool reads
+the affected points and writes them back with `energy_consumed` and `energy_produced` swapped.
+No other field is touched.
+
+**Which periods.** A kit can move to another meter, so the orientation is decided per day, not per kit:
+
+1. **Per day**, compare the integral of `power_consumed` (kWh) with the daily delta of each counter. The closer counter is the import counter. The app already detects orientation the same way.
+2. **Days without a clear vote** get the orientation of their neighbours: too little use, too little data, or both counters close.
+3. **Merge** the days into contiguous periods per signature.
+4. **Only periods voted "swapped"** that end before the switch to the new parser are corrected.
+
+**Safety.**
+
+- **Dry-run first, and it is the default.** It lists the signatures and periods that would be corrected, with the evidence per period, and the number of points.
+- **Backup.** Before writing, the affected series are exported as gzipped line protocol, so they can be restored.
+- **Never swapped twice.**
+  - Every correction is recorded in the measurement `dsmr_corrections`: tag `signature`, fields `from`, `to`, `kind` and `points`.
+  - Recorded periods are skipped.
+  - A corrected day votes "as named", so it is not selected again.
+- **Batches.** Points are written in batches with retry and can be resumed. Tens of millions of points take hours.
+- **Rehearsal.** The tool is tested on a copy of a few series in the test bucket first.
+- **Production.** The production run needs the user's explicit approval and a write token the user sets. Development and tests never write to `p1-smartmeters`.
+
+**Order.**
+1. The new parser goes live, so no new swapped data arrives.
+2. The history up to the switch is corrected.
+3. The app keeps its orientation detection as a safety net.
+
+**Not correctable: the zeros for missing gas.** InfluxDB 2 can only delete whole points, by
+tag and time, not a single field. The `gas_delivered=0` values written for households
+without gas therefore stay in history; only new data omits them.
+
+## 14. Open questions
 
 | #   | Topic                       | Proposal                                                                   |
 | --- | --------------------------- | -------------------------------------------------------------------------- |
