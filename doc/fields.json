@@ -1,0 +1,628 @@
+{
+  "registry": "a3b66ee46beff6dc",
+  "fields": [
+    {
+      "field": "power_consumed",
+      "obis": [
+        "1-0:1.7.0"
+      ],
+      "unit": "kW",
+      "type": "float",
+      "description": "Actual electricity power delivered to the client (+P)",
+      "occurs": "all",
+      "point": "electricity",
+      "telegram_units": [
+        "W",
+        "kW"
+      ]
+    },
+    {
+      "field": "power_produced",
+      "obis": [
+        "1-0:2.7.0"
+      ],
+      "unit": "kW",
+      "type": "float",
+      "description": "Actual electricity power received from the client (-P)",
+      "occurs": "all",
+      "point": "electricity",
+      "telegram_units": [
+        "W",
+        "kW"
+      ]
+    },
+    {
+      "field": "energy_consumed_t1",
+      "obis": [
+        "1-0:1.8.1"
+      ],
+      "unit": "kWh",
+      "type": "float",
+      "description": "Meter reading, electricity delivered to the client, tariff 1",
+      "occurs": "all",
+      "point": "electricity",
+      "telegram_units": [
+        "Wh",
+        "kWh"
+      ]
+    },
+    {
+      "field": "energy_consumed_t2",
+      "obis": [
+        "1-0:1.8.2"
+      ],
+      "unit": "kWh",
+      "type": "float",
+      "description": "Meter reading, electricity delivered to the client, tariff 2",
+      "occurs": "all",
+      "point": "electricity",
+      "telegram_units": [
+        "Wh",
+        "kWh"
+      ]
+    },
+    {
+      "field": "energy_produced_t1",
+      "obis": [
+        "1-0:2.8.1"
+      ],
+      "unit": "kWh",
+      "type": "float",
+      "description": "Meter reading, electricity delivered by the client, tariff 1",
+      "occurs": "all",
+      "point": "electricity",
+      "telegram_units": [
+        "Wh",
+        "kWh"
+      ]
+    },
+    {
+      "field": "energy_produced_t2",
+      "obis": [
+        "1-0:2.8.2"
+      ],
+      "unit": "kWh",
+      "type": "float",
+      "description": "Meter reading, electricity delivered by the client, tariff 2",
+      "occurs": "all",
+      "point": "electricity",
+      "telegram_units": [
+        "Wh",
+        "kWh"
+      ]
+    },
+    {
+      "field": "tariff",
+      "obis": [
+        "0-0:96.14.0"
+      ],
+      "unit": null,
+      "type": "int",
+      "description": "Tariff indicator electricity",
+      "occurs": "all",
+      "point": "electricity",
+      "telegram_units": []
+    },
+    {
+      "field": "power_consumed_l1",
+      "obis": [
+        "1-0:21.7.0"
+      ],
+      "unit": "kW",
+      "type": "float",
+      "description": "Instantaneous active power delivered to the client (+P), phase L1",
+      "occurs": "NL DSMR 4/5",
+      "point": "electricity",
+      "telegram_units": [
+        "W",
+        "kW"
+      ]
+    },
+    {
+      "field": "power_consumed_l2",
+      "obis": [
+        "1-0:41.7.0"
+      ],
+      "unit": "kW",
+      "type": "float",
+      "description": "Instantaneous active power delivered to the client (+P), phase L2",
+      "occurs": "NL DSMR 4/5",
+      "point": "electricity",
+      "telegram_units": [
+        "W",
+        "kW"
+      ]
+    },
+    {
+      "field": "power_consumed_l3",
+      "obis": [
+        "1-0:61.7.0"
+      ],
+      "unit": "kW",
+      "type": "float",
+      "description": "Instantaneous active power delivered to the client (+P), phase L3",
+      "occurs": "NL DSMR 4/5",
+      "point": "electricity",
+      "telegram_units": [
+        "W",
+        "kW"
+      ]
+    },
+    {
+      "field": "power_produced_l1",
+      "obis": [
+        "1-0:22.7.0"
+      ],
+      "unit": "kW",
+      "type": "float",
+      "description": "Instantaneous active power received from the client (-P), phase L1",
+      "occurs": "NL DSMR 4/5",
+      "point": "electricity",
+      "telegram_units": [
+        "W",
+        "kW"
+      ]
+    },
+    {
+      "field": "power_produced_l2",
+      "obis": [
+        "1-0:42.7.0"
+      ],
+      "unit": "kW",
+      "type": "float",
+      "description": "Instantaneous active power received from the client (-P), phase L2",
+      "occurs": "NL DSMR 4/5",
+      "point": "electricity",
+      "telegram_units": [
+        "W",
+        "kW"
+      ]
+    },
+    {
+      "field": "power_produced_l3",
+      "obis": [
+        "1-0:62.7.0"
+      ],
+      "unit": "kW",
+      "type": "float",
+      "description": "Instantaneous active power received from the client (-P), phase L3",
+      "occurs": "NL DSMR 4/5",
+      "point": "electricity",
+      "telegram_units": [
+        "W",
+        "kW"
+      ]
+    },
+    {
+      "field": "voltage_l1",
+      "obis": [
+        "1-0:32.7.0"
+      ],
+      "unit": "V",
+      "type": "float",
+      "description": "Instantaneous voltage, phase L1",
+      "occurs": "NL DSMR 4/5",
+      "point": "electricity",
+      "telegram_units": [
+        "V"
+      ]
+    },
+    {
+      "field": "voltage_l2",
+      "obis": [
+        "1-0:52.7.0"
+      ],
+      "unit": "V",
+      "type": "float",
+      "description": "Instantaneous voltage, phase L2",
+      "occurs": "NL DSMR 4/5",
+      "point": "electricity",
+      "telegram_units": [
+        "V"
+      ]
+    },
+    {
+      "field": "voltage_l3",
+      "obis": [
+        "1-0:72.7.0"
+      ],
+      "unit": "V",
+      "type": "float",
+      "description": "Instantaneous voltage, phase L3",
+      "occurs": "NL DSMR 4/5",
+      "point": "electricity",
+      "telegram_units": [
+        "V"
+      ]
+    },
+    {
+      "field": "current_l1",
+      "obis": [
+        "1-0:31.7.0"
+      ],
+      "unit": "A",
+      "type": "float",
+      "description": "Instantaneous current, phase L1",
+      "occurs": "NL DSMR 4/5",
+      "point": "electricity",
+      "telegram_units": [
+        "A"
+      ]
+    },
+    {
+      "field": "current_l2",
+      "obis": [
+        "1-0:51.7.0"
+      ],
+      "unit": "A",
+      "type": "float",
+      "description": "Instantaneous current, phase L2",
+      "occurs": "NL DSMR 4/5",
+      "point": "electricity",
+      "telegram_units": [
+        "A"
+      ]
+    },
+    {
+      "field": "current_l3",
+      "obis": [
+        "1-0:71.7.0"
+      ],
+      "unit": "A",
+      "type": "float",
+      "description": "Instantaneous current, phase L3",
+      "occurs": "NL DSMR 4/5",
+      "point": "electricity",
+      "telegram_units": [
+        "A"
+      ]
+    },
+    {
+      "field": "voltage_sags_l1",
+      "obis": [
+        "1-0:32.32.0"
+      ],
+      "unit": null,
+      "type": "int",
+      "description": "Number of voltage sags, phase L1",
+      "occurs": "NL DSMR 4/5",
+      "point": "electricity",
+      "telegram_units": []
+    },
+    {
+      "field": "voltage_sags_l2",
+      "obis": [
+        "1-0:52.32.0"
+      ],
+      "unit": null,
+      "type": "int",
+      "description": "Number of voltage sags, phase L2",
+      "occurs": "NL DSMR 4/5",
+      "point": "electricity",
+      "telegram_units": []
+    },
+    {
+      "field": "voltage_sags_l3",
+      "obis": [
+        "1-0:72.32.0"
+      ],
+      "unit": null,
+      "type": "int",
+      "description": "Number of voltage sags, phase L3",
+      "occurs": "NL DSMR 4/5",
+      "point": "electricity",
+      "telegram_units": []
+    },
+    {
+      "field": "voltage_swells_l1",
+      "obis": [
+        "1-0:32.36.0"
+      ],
+      "unit": null,
+      "type": "int",
+      "description": "Number of voltage swells, phase L1",
+      "occurs": "NL DSMR 4/5",
+      "point": "electricity",
+      "telegram_units": []
+    },
+    {
+      "field": "voltage_swells_l2",
+      "obis": [
+        "1-0:52.36.0"
+      ],
+      "unit": null,
+      "type": "int",
+      "description": "Number of voltage swells, phase L2",
+      "occurs": "NL DSMR 4/5",
+      "point": "electricity",
+      "telegram_units": []
+    },
+    {
+      "field": "voltage_swells_l3",
+      "obis": [
+        "1-0:72.36.0"
+      ],
+      "unit": null,
+      "type": "int",
+      "description": "Number of voltage swells, phase L3",
+      "occurs": "NL DSMR 4/5",
+      "point": "electricity",
+      "telegram_units": []
+    },
+    {
+      "field": "power_failures",
+      "obis": [
+        "0-0:96.7.21"
+      ],
+      "unit": null,
+      "type": "int",
+      "description": "Number of power failures in any phase",
+      "occurs": "NL DSMR 4/5",
+      "point": "electricity",
+      "telegram_units": []
+    },
+    {
+      "field": "long_power_failures",
+      "obis": [
+        "0-0:96.7.9"
+      ],
+      "unit": null,
+      "type": "int",
+      "description": "Number of long power failures in any phase",
+      "occurs": "NL DSMR 4/5",
+      "point": "electricity",
+      "telegram_units": []
+    },
+    {
+      "field": "demand_current",
+      "obis": [
+        "1-0:1.4.0"
+      ],
+      "unit": "kW",
+      "type": "float",
+      "description": "Current average demand, active energy import (quarter hour)",
+      "occurs": "BE e-MUCS",
+      "point": "electricity",
+      "telegram_units": [
+        "W",
+        "kW"
+      ]
+    },
+    {
+      "field": "demand_max_month",
+      "obis": [
+        "1-0:1.6.0"
+      ],
+      "unit": "kW",
+      "type": "float",
+      "description": "Maximum demand of the running month, active energy import",
+      "occurs": "BE e-MUCS",
+      "point": "electricity",
+      "telegram_units": [
+        "W",
+        "kW"
+      ]
+    },
+    {
+      "field": "power_threshold",
+      "obis": [
+        "0-0:17.0.0"
+      ],
+      "unit": "kW",
+      "type": "float",
+      "description": "Actual threshold electricity (limiter)",
+      "occurs": "DSMR 2.2/3, BE",
+      "point": "electricity",
+      "telegram_units": [
+        "W",
+        "kW"
+      ]
+    },
+    {
+      "field": "breaker_state",
+      "obis": [
+        "0-0:96.3.10"
+      ],
+      "unit": null,
+      "type": "int",
+      "description": "Breaker state (0 disconnected, 1 connected, 2 ready for reconnection)",
+      "occurs": "DSMR 2.2/3, BE",
+      "point": "electricity",
+      "telegram_units": []
+    },
+    {
+      "field": "current_threshold",
+      "obis": [
+        "1-0:31.4.0"
+      ],
+      "unit": "A",
+      "type": "float",
+      "description": "Limiter current threshold",
+      "occurs": "BE e-MUCS",
+      "point": "electricity",
+      "telegram_units": [
+        "A"
+      ]
+    },
+    {
+      "field": "reactive_power_consumed",
+      "obis": [
+        "1-0:3.7.0"
+      ],
+      "unit": "kvar",
+      "type": "float",
+      "description": "Instantaneous reactive power import (+Q)",
+      "occurs": "LU Smarty",
+      "point": "electricity",
+      "telegram_units": [
+        "kvar",
+        "var"
+      ]
+    },
+    {
+      "field": "reactive_power_produced",
+      "obis": [
+        "1-0:4.7.0"
+      ],
+      "unit": "kvar",
+      "type": "float",
+      "description": "Instantaneous reactive power export (-Q)",
+      "occurs": "LU Smarty",
+      "point": "electricity",
+      "telegram_units": [
+        "kvar",
+        "var"
+      ]
+    },
+    {
+      "field": "reactive_energy_consumed",
+      "obis": [
+        "1-0:3.8.0"
+      ],
+      "unit": "kvarh",
+      "type": "float",
+      "description": "Meter reading, reactive energy import (+Q)",
+      "occurs": "LU Smarty",
+      "point": "electricity",
+      "telegram_units": [
+        "kvarh",
+        "varh"
+      ]
+    },
+    {
+      "field": "reactive_energy_produced",
+      "obis": [
+        "1-0:4.8.0"
+      ],
+      "unit": "kvarh",
+      "type": "float",
+      "description": "Meter reading, reactive energy export (-Q)",
+      "occurs": "LU Smarty",
+      "point": "electricity",
+      "telegram_units": [
+        "kvarh",
+        "varh"
+      ]
+    },
+    {
+      "field": "energy_consumed",
+      "obis": [
+        "1-0:1.8.1",
+        "1-0:1.8.2",
+        "1-0:1.8.0"
+      ],
+      "unit": "kWh",
+      "type": "float",
+      "description": "Electricity delivered to the client, all tariffs: 1.8.1 + 1.8.2, or 1.8.0 when the meter has no tariff registers",
+      "occurs": "all",
+      "point": "electricity",
+      "derived": true
+    },
+    {
+      "field": "energy_produced",
+      "obis": [
+        "1-0:2.8.1",
+        "1-0:2.8.2",
+        "1-0:2.8.0"
+      ],
+      "unit": "kWh",
+      "type": "float",
+      "description": "Electricity delivered by the client, all tariffs: 2.8.1 + 2.8.2, or 2.8.0",
+      "occurs": "all",
+      "point": "electricity",
+      "derived": true
+    },
+    {
+      "field": "clock_offset_s",
+      "obis": [
+        "0-0:1.0.0"
+      ],
+      "unit": "s",
+      "type": "int",
+      "description": "Receipt time minus the meter clock, in whole seconds",
+      "occurs": "all",
+      "point": "electricity",
+      "derived": true
+    },
+    {
+      "field": "meter_manufacturer",
+      "obis": [
+        "identification line"
+      ],
+      "unit": null,
+      "type": "string",
+      "description": "3-letter manufacturer code from the identification line (e.g. KFM, XMX); the rest of that line is not stored because it may contain a serial number",
+      "occurs": "all",
+      "point": "electricity",
+      "derived": true
+    },
+    {
+      "field": "dsmr_version",
+      "obis": [
+        "1-3:0.2.8",
+        "0-0:96.1.4"
+      ],
+      "unit": null,
+      "type": "string",
+      "description": "P1 version, e.g. 50 or 42; BE versions are prefixed with BE",
+      "occurs": "all",
+      "point": "electricity",
+      "derived": true
+    },
+    {
+      "field": "gas_delivered",
+      "obis": [
+        "0-n:24.2.1",
+        "0-n:24.2.3",
+        "0-n:24.3.0"
+      ],
+      "unit": "m3",
+      "type": "float",
+      "description": "Gas meter reading; time = capture time from the telegram (0-n:24.3.0: DSMR 2.2/3, 0-n:24.2.3: BE)",
+      "occurs": "M-Bus device type 3",
+      "point": "mbus",
+      "telegram_units": [
+        "m3"
+      ]
+    },
+    {
+      "field": "water_delivered",
+      "obis": [
+        "0-n:24.2.1"
+      ],
+      "unit": "m3",
+      "type": "float",
+      "description": "Water meter reading; time = capture time from the telegram",
+      "occurs": "M-Bus device type 7",
+      "point": "mbus",
+      "telegram_units": [
+        "m3"
+      ]
+    },
+    {
+      "field": "heat_delivered",
+      "obis": [
+        "0-n:24.2.1"
+      ],
+      "unit": "GJ",
+      "type": "float",
+      "description": "Heat meter reading; time = capture time from the telegram",
+      "occurs": "M-Bus device type 4",
+      "point": "mbus",
+      "telegram_units": [
+        "GJ",
+        "MJ",
+        "MWh",
+        "kWh"
+      ]
+    }
+  ],
+  "never_stored": {
+    "0-0:96.1.1": "Equipment identifier (EAN/serial) of the electricity meter",
+    "0-n:96.1.0": "Equipment identifier of an M-Bus device",
+    "0-0:96.13.0": "Text message from the grid operator",
+    "0-0:96.13.1": "Text message codes",
+    "1-0:99.97.0": "Power failure event log (the counters are stored instead)",
+    "0-n:24.4.0": "Gas valve position (DSMR 2.2/3); a switch state, not a measurement"
+  }
+}
