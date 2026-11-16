@@ -14,7 +14,8 @@ if ! gh release view "$tag" >/dev/null 2>&1; then
 fi
 gh release upload "$tag" "out/$package" --clobber
 gh release upload "$tag" out/manifest.json --clobber
+# awk instead of grep: no match is not an error under pipefail (the first release has none).
 gh release view "$tag" --json assets --jq '.assets[].name' |
-  grep -E '^emon2influx-parser-[0-9a-f]{40}\.tar\.gz$' | grep -vx -- "$package" |
+  awk -v keep="$package" '/^emon2influx-parser-[0-9a-f]{40}\.tar\.gz$/ && $0 != keep' |
   while read -r old; do gh release delete-asset "$tag" "$old" --yes; done
 echo "published $package to $tag"
