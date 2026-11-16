@@ -4,10 +4,12 @@ which concrete classes are used; the rest receives its collaborators through the
 import queue
 from dataclasses import dataclass
 
+from . import build_version
 from .config import Settings
 from .diagnostics import ErrorEvent, ErrorReporter
 from .errors import Category
 from .fieldmap import FieldMapPublisher, FieldMapState
+from .health import HealthReporter
 from .metrics import Metrics
 from .payload.registry import DecoderRegistry
 from .pipeline import Pipeline
@@ -35,6 +37,7 @@ class Components:
     sink: InfluxSink
     summary: SummaryReporter
     field_map: FieldMapPublisher | None
+    health: HealthReporter | None
 
 
 def build(settings: Settings, writer: Writer | None = None) -> Components:
@@ -63,8 +66,9 @@ def build(settings: Settings, writer: Writer | None = None) -> Components:
         metrics,
     )
     spool = DiskSpool(settings.spool_dir, settings.spool_max_mb * 1024 * 1024)
+    delivery = Delivery(writer, metrics, reporter)
     sink = InfluxSink(
-        Delivery(writer, metrics, reporter),
+        delivery,
         spool,
         metrics,
         reporter,
@@ -98,4 +102,14 @@ def build(settings: Settings, writer: Writer | None = None) -> Components:
         sink,
         SummaryReporter(metrics, spool),
         field_map,
+        HealthReporter(
+            settings.health_file,
+            build_version(),
+            mqtt_connected=source.is_connected,
+            metrics=metrics,
+            delivery=delivery,
+            spool=spool,
+        )
+        if settings.health_file
+        else None,
     )

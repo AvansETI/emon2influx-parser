@@ -46,17 +46,41 @@ Replays logs of the old `emon2influx` through the new parser and reports the dif
 .venv/bin/python -m emon2influx.tools.replay /path/to/emon2influx.log
 ```
 
-## Deployment (systemd)
+## Deployment
+
+Directly on an LXC (Ubuntu 24.04, Python 3.12) with systemd; no container images. The LXC
+fetches new releases itself, so it needs no inbound access (doc/architecture.md §11.1).
+
+- **Release:** every push to `main` that passes CI publishes a package to the rolling
+  pre-release `main-latest` (`deploy/package.sh`, `deploy/publish.sh`).
+- **Update:** `emon2influx-update.timer` checks every minute. A new release is installed next to
+  the running one, the service restarts, and without a healthy `health.json` within 90 s the
+  previous release comes back.
+
+First installation, once, as root:
 
 ```sh
-sudo useradd --system --no-create-home emon2influx
-sudo git clone <repo> /opt/emon2influx-parser
-sudo python3 -m venv /opt/emon2influx-parser/.venv
-sudo /opt/emon2influx-parser/.venv/bin/pip install /opt/emon2influx-parser
-sudo install -d -m 700 -o emon2influx /etc/emon2influx-parser
-sudo install -m 600 -o emon2influx .env.example /etc/emon2influx-parser/env   # then fill in
-sudo cp deploy/emon2influx-parser.service /etc/systemd/system/
-sudo systemctl daemon-reload && sudo systemctl enable --now emon2influx-parser
-journalctl -u emon2influx-parser -f
+curl -fsSLO https://raw.githubusercontent.com/AvansETI/emon2influx-parser/main/deploy/install.sh
+less install.sh                        # read it first
+sudo bash install.sh
+sudo nano /etc/emon2influx-parser/env  # fill in; never commit or share it
+sudo emon2influx-update                # installs the current release and starts the service
 ```
 
+Day to day:
+
+```sh
+journalctl -u emon2influx-parser -f    # the parser
+journalctl -u emon2influx-update       # what the updater did
+sudo emon2influx-update                # check for a release now
+sudo emon2influx-update --rollback     # back to the previous release
+cat /var/lib/emon2influx-parser/health.json
+```
+
+## License
+
+Copyright 2026 Arno Broeders.
+
+Licensed under the [Apache License, Version 2.0](LICENSE): you may use, modify and
+distribute this software freely, provided you keep the [NOTICE](NOTICE) file and credit the
+author.

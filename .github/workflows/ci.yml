@@ -1,0 +1,55 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e '.[dev]'
+      - run: ruff check src tests
+      - run: ruff format --check src tests
+      - run: mypy
+      - run: pytest
+      - run: python -m emon2influx.tools.fields --check
+      - run: shellcheck deploy/*.sh deploy/emon2influx-update
+
+  package:
+    # Only main is released; the LXC installs it within about a minute (doc/architecture.md §11.1).
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: check
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    concurrency:
+      group: release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: deploy/package.sh "$GITHUB_SHA"
+      - name: Install the package with the updater (dry run)
+        run: |
+          root="$RUNNER_TEMP/lxc"
+          mkdir -p "$root/systemd" "$root/sbin"
+          printf 'MQTT_HOST=broker.example\nMODE=dry-run\n' >"$root/env"
+          E2I_APP_DIR="$root/opt" E2I_STATE_DIR="$root/state" E2I_ENV_FILE="$root/env" \
+          E2I_SYSTEMD_DIR="$root/systemd" E2I_SCRIPT_PATH="$root/sbin/emon2influx-update" \
+            deploy/emon2influx-update --dry-run --manifest out/manifest.json \
+              --package "out/$(python3 -c 'import json; print(json.load(open("out/manifest.json"))["package"])')"
+          "$root/opt/current/venv/bin/python" -m emon2influx --version | grep -F "+${GITHUB_SHA:0:7}"
+      - run: deploy/publish.sh
+        env:
+          GH_TOKEN: ${{ github.token }}

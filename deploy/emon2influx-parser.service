@@ -1,5 +1,5 @@
 # systemd unit for emon2influx-parser (doc/architecture.md §11).
-# Install: see README.md. The environment file holds the settings and secrets (mode 600).
+# Installed by deploy/install.sh and kept up to date by emon2influx-update.
 [Unit]
 Description=emon2influx-parser: P1 telegrams from MQTT to InfluxDB
 Wants=network-online.target
@@ -11,16 +11,17 @@ User=emon2influx
 Group=emon2influx
 EnvironmentFile=/etc/emon2influx-parser/env
 WorkingDirectory=/var/lib/emon2influx-parser
-ExecStart=/opt/emon2influx-parser/.venv/bin/python -m emon2influx
-# Spool and state survive restarts; logs go to journald and to LOG_DIR.
+ExecStart=/opt/emon2influx-parser/current/venv/bin/python -m emon2influx --env-file /dev/null
+# Spool, state and health survive restarts; logs go to journald and to LOG_DIR.
 StateDirectory=emon2influx-parser
 LogsDirectory=emon2influx-parser
 Environment=SPOOL_DIR=/var/lib/emon2influx-parser/spool
+Environment=HEALTH_FILE=/var/lib/emon2influx-parser/health.json
 Environment=LOG_DIR=/var/log/emon2influx-parser
 Environment=QUARANTINE_FILE=/var/log/emon2influx-parser/quarantine.jsonl
 Restart=always
 RestartSec=5
-# Time to flush the last batch to InfluxDB or the spool.
+# Time to drain the queue and flush the last batch to InfluxDB or the spool.
 TimeoutStopSec=45
 
 NoNewPrivileges=true

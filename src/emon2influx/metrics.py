@@ -22,6 +22,7 @@ class Metrics:
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
+        self._totals: Counter[str] = Counter()  # since the start; never reset
         self._reset()
 
     def _reset(self) -> None:
@@ -33,6 +34,7 @@ class Metrics:
     def incr(self, name: str, amount: int = 1) -> None:
         with self._lock:
             self._counters[name] += amount
+            self._totals[name] += amount
 
     def error(self, category: str, amount: int = 1) -> None:
         with self._lock:
@@ -46,6 +48,11 @@ class Metrics:
         if codes:
             with self._lock:
                 self._unknown.update(codes)
+
+    def total(self, name: str) -> int:
+        """Since the start of the process, unaffected by summaries."""
+        with self._lock:
+            return self._totals[name]
 
     def snapshot(self, *, reset: bool = False) -> MetricsSnapshot:
         with self._lock:

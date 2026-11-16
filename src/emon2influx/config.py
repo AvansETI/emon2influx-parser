@@ -53,6 +53,7 @@ class Settings:
     log_keep: int
     quarantine_file: Path | None
     error_log_limit_per_hour: int
+    health_file: Path | None
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "Settings":
@@ -89,6 +90,7 @@ class Settings:
             log_keep=reader.integer("LOG_KEEP", 48, 1, 10_000),
             quarantine_file=reader.optional_path("QUARANTINE_FILE", "logs/quarantine.jsonl"),
             error_log_limit_per_hour=reader.integer("ERROR_LOG_LIMIT_PER_HOUR", 5, 0, 10_000),
+            health_file=reader.optional_path("HEALTH_FILE", "health.json"),
         )
         if (
             writing

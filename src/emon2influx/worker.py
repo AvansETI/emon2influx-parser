@@ -4,6 +4,7 @@ the points to the sink."""
 import queue
 import threading
 
+from .health import HealthReporter
 from .pipeline import Pipeline
 from .sink.sink import InfluxSink
 from .source.mqtt import Message
@@ -17,11 +18,13 @@ class Worker:
         pipeline: Pipeline,
         sink: InfluxSink,
         summary: SummaryReporter,
+        health: HealthReporter | None = None,
     ) -> None:
         self.messages = messages
         self.pipeline = pipeline
         self.sink = sink
         self.summary = summary
+        self.health = health
 
     def run(self, stop: threading.Event) -> None:
         while not stop.is_set():
@@ -32,6 +35,8 @@ class Worker:
             else:
                 self.sink.add(self.pipeline.process(raw, received_at))
             self.summary.maybe_report()
+            if self.health:
+                self.health.maybe_write()
 
     def drain(self) -> int:
         """Processes what was already received; returns the number of messages."""

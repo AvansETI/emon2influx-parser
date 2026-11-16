@@ -1,0 +1,10 @@
+# Installs a new release of emon2influx-parser when one is published (doc/architecture.md §11.1).
+[Unit]
+Description=emon2influx-parser: check for and install a new release
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/emon2influx-update
+TimeoutStartSec=10min
