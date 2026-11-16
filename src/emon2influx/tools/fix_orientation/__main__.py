@@ -36,7 +36,13 @@ from .plan import Plan, make_plan
 from .store import InfluxStore, checked
 
 PRODUCTION = "p1-smartmeters"
-FIELDS = ("power_consumed", "power_produced", "energy_consumed", "energy_produced")
+FIELDS = (
+    "power_consumed",
+    "power_produced",
+    "energy_consumed",
+    "energy_produced",
+    "gas_delivered",
+)
 
 
 def open_store(env_file: Path, bucket: str | None = None) -> InfluxStore:

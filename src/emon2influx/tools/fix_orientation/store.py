@@ -197,6 +197,67 @@ data
                 if isinstance(value, float):
                     yield f"{self.measurement},signature={sig} {record.get_field()}={value!r} {ns}"
 
+    def field_summary(
+        self, field: str, start: datetime, stop: datetime
+    ) -> dict[str, tuple[int, float]]:
+        """Per signature: number of points and maximum of `field`, in blocks of 60 days."""
+        summary: dict[str, tuple[int, float]] = {}
+        block_start = start
+        while block_start < stop:
+            block_stop = min(stop, day_start(local_day(block_start) + timedelta(days=60)))
+            base = f"""{self._range(block_start, block_stop)}
+  |> filter(fn: (r) => r._measurement == "{self.measurement}" and r._field == "{field}")
+  |> group(columns: ["signature"])"""
+            counts = {
+                str(r["signature"]): int(r.get_value())
+                for t in self.query_api.query(base + "\n  |> count()")
+                for r in t.records
+            }
+            maxima = {
+                str(r["signature"]): float(r.get_value())
+                for t in self.query_api.query(base + "\n  |> max()")
+                for r in t.records
+            }
+            for sig, count in counts.items():
+                old_count, old_max = summary.get(sig, (0, float("-inf")))
+                summary[sig] = (old_count + count, max(old_max, maxima.get(sig, old_max)))
+            block_start = block_stop
+        return summary
+
+    def point_lines(self, signature: str, start: datetime, stop: datetime) -> list[str]:
+        """Every point of a household in [start, stop) with all its fields and types."""
+        from influxdb_client.client.write.point import Point
+        from influxdb_client.domain.write_precision import WritePrecision
+
+        sig = checked(signature)
+        flux = f"""{self._range(start, stop)}
+  |> filter(fn: (r) => r._measurement == "{self.measurement}" and r.signature == "{sig}")
+  |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+"""
+        skip = {"result", "table", "_start", "_stop", "_time", "_measurement", "signature"}
+        lines = []
+        for table in self.query_api.query(flux):
+            for record in table.records:
+                point = Point(self.measurement).tag("signature", sig)
+                for key, value in record.values.items():
+                    if key not in skip and value is not None:
+                        point = point.field(key, value)
+                moment: datetime = record.get_time()
+                ns = (moment - datetime(1970, 1, 1, tzinfo=UTC)) // timedelta(microseconds=1) * 1000
+                lines.append(point.time(ns, WritePrecision.NS).to_line_protocol())
+        return lines
+
+    def delete_points(self, signature: str, start: datetime, stop: datetime) -> None:
+        """Deletes all points of a household in [start, stop). Influx's stop is inclusive."""
+        sig = checked(signature)
+        self.client.delete_api().delete(
+            start,
+            stop - timedelta(microseconds=1),
+            f'_measurement="{self.measurement}" AND signature="{sig}"',
+            bucket=self.bucket,
+            org=self.org,
+        )
+
     def corrections(self, signature: str) -> list[Correction]:
         sig = checked(signature)
         flux = f'''from(bucket: "{self.bucket}") |> range(start: 0)

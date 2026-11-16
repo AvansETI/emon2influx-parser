@@ -59,6 +59,10 @@ python -m emon2influx.tools.fix_orientation apply --env write.env --plan plan.js
 `plan` is read-only. `apply` backs up every period first; `restore --backup FILE --yes` undoes
 it. Rehearse with `copy` into the test bucket first.
 
+Households without a gas meter (gas 0 in every point) can be rewritten without their
+`gas_delivered=0` with `python -m emon2influx.tools.drop_zero_gas plan|apply|restore`, in the
+same way (doc/architecture.md §13.1).
+
 ## Deployment
 
 Directly on an LXC (Ubuntu 24.04, Python 3.12) with systemd; no container images. The LXC

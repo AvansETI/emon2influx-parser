@@ -29,3 +29,4 @@ src/emon2influx/build.json
 # fix_orientation: plans and backups hold full signatures
 plan.json
 backups/
+gas-plan.json

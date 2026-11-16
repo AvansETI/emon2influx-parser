@@ -55,6 +55,7 @@ module = [
   "emon2influx.fieldmap",
   "emon2influx.sink.writer",
   "emon2influx.tools.fix_orientation.store",
+  "emon2influx.tools.drop_zero_gas.core",
 ]
 disallow_untyped_calls = false
 
