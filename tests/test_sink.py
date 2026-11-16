@@ -1,8 +1,12 @@
 from pathlib import Path
 
 from emon2influx.diagnostics import ErrorReporter
-from emon2influx.sink.influx import InfluxSink, WriteError
+from emon2influx.metrics import Metrics
+from emon2influx.sink.backoff import BackoffPolicy
+from emon2influx.sink.delivery import Delivery
+from emon2influx.sink.sink import InfluxSink
 from emon2influx.sink.spool import DiskSpool
+from emon2influx.sink.writer import WriteError
 
 
 class FakeInflux:
@@ -35,11 +39,12 @@ class Clock:
 
 
 def make(tmp_path: Path, max_bytes: int = 10_000_000) -> tuple[InfluxSink, FakeInflux, Clock]:
-    influx, clock = FakeInflux(), Clock()
-    reporter = ErrorReporter(quarantine_file=tmp_path / "q.jsonl", limit_per_hour=5)
+    influx, clock, metrics = FakeInflux(), Clock(), Metrics()
+    reporter = ErrorReporter.create(metrics, limit_per_hour=5, quarantine_file=tmp_path / "q.jsonl")
     sink = InfluxSink(
-        influx,
+        Delivery(influx, metrics, reporter),
         DiskSpool(tmp_path / "spool", max_bytes),
+        metrics,
         reporter,
         batch_size=3,
         flush_interval_s=1,
@@ -115,7 +120,7 @@ def test_rejected_data_is_quarantined_not_retried(tmp_path: Path) -> None:
     sink.add(lines(0, 3))
     sink.tick()
     assert sink.spool.is_empty()
-    assert sink.stats["rejected"] == 3
+    assert sink.metrics.snapshot().counters["rejected_points"] == 3
     assert "influx_rejected" in (tmp_path / "q.jsonl").read_text()
 
 
@@ -125,7 +130,20 @@ def test_full_spool_drops_the_oldest(tmp_path: Path) -> None:
     for i in range(10):
         sink.add(lines(i * 3, 3))
         sink.tick()
-    assert sink.stats["dropped"] > 0
+    assert sink.metrics.snapshot().counters["dropped"] > 0
     assert sink.spool.size_bytes <= 200 or sink.spool.count_files() == 1
     newest = sink.spool.read(sorted((tmp_path / "spool").glob("*.lp"))[-1])
     assert newest == lines(27, 3)
+
+
+def test_backoff_doubles_up_to_the_maximum() -> None:
+    clock = Clock()
+    backoff = BackoffPolicy(minimum_s=1, maximum_s=5, clock=clock)
+    assert backoff.ready()
+    assert [backoff.failed() for _ in range(5)] == [1, 2, 4, 5, 5]
+    assert not backoff.ready()
+    clock.now = 5
+    assert backoff.ready()
+    backoff.failed()
+    backoff.succeeded()
+    assert backoff.ready() and backoff.delay_s == 0

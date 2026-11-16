@@ -4,8 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from emon2influx.diagnostics import ErrorReporter
+from emon2influx.diagnostics import ErrorEvent, ErrorReporter
 from emon2influx.errors import Category, RejectedMessage
+from emon2influx.metrics import Metrics
 from emon2influx.payload.registry import DecoderRegistry
 from emon2influx.pipeline import Pipeline
 from emon2influx.points import PointBuilder
@@ -29,8 +30,11 @@ PREFIXES = ("2019-ETI-EMON-V01",)
 
 def make(tmp_path: Path) -> tuple[Pipeline, Path]:
     quarantine = tmp_path / "quarantine.jsonl"
-    reporter = ErrorReporter(quarantine_file=quarantine, limit_per_hour=5)
-    pipeline = Pipeline(DecoderRegistry(PREFIXES), TelegramParser(), PointBuilder("dsmr"), reporter)
+    metrics = Metrics()
+    reporter = ErrorReporter.create(metrics, limit_per_hour=5, quarantine_file=quarantine)
+    pipeline = Pipeline(
+        DecoderRegistry(PREFIXES), TelegramParser(), PointBuilder("dsmr"), reporter, metrics
+    )
     return pipeline, quarantine
 
 
@@ -111,7 +115,7 @@ class TestPipeline:
         electricity, _gas = pipeline.process(payload(broken), RECEIVED)
         assert "crc_valid=false" in electricity
         assert "power_consumed=1.194" in electricity
-        assert pipeline.reporter.take_counts() == {"crc": 1}
+        assert pipeline.metrics.snapshot().errors == {"crc": 1}
         assert not quarantine.exists()
 
     def test_valid_crc_is_flagged_true_and_old_meters_have_no_flag(self, tmp_path: Path) -> None:
@@ -129,7 +133,7 @@ class TestPipeline:
         assert record["signature"] == SIGNATURE
         assert EAN not in record["raw"]
         assert "0-0:96.1.1(…)" in record["raw"]
-        assert pipeline.stats["rejected"] == 1
+        assert pipeline.metrics.snapshot().counters["rejected"] == 1
 
     def test_noise_is_not_quarantined(self, tmp_path: Path) -> None:
         pipeline, quarantine = make(tmp_path)
@@ -140,16 +144,18 @@ class TestPipeline:
         pipeline, _ = make(tmp_path)
         pipeline.process(payload(with_crc([*DSMR50_LINES, "1-0:14.7.0(50.01*Hz)"])), RECEIVED)
         pipeline.process(payload(without_crc(NO_GAS_LINES), OTHER_SIGNATURE), RECEIVED)
-        assert pipeline.kits == {SIGNATURE, OTHER_SIGNATURE}
-        assert pipeline.unknown_codes == {"1-0:14.7.0": 1}
+        snap = pipeline.metrics.snapshot()
+        assert snap.kits == {SIGNATURE, OTHER_SIGNATURE}
+        assert snap.unknown_codes == {"1-0:14.7.0": 1}
 
 
-def test_error_log_is_rate_limited(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
-    reporter = ErrorReporter(quarantine_file=None, limit_per_hour=2)
+def test_error_log_is_rate_limited(caplog: pytest.LogCaptureFixture) -> None:
+    metrics = Metrics()
+    reporter = ErrorReporter.create(metrics, limit_per_hour=2, quarantine_file=None)
     with caplog.at_level("WARNING", logger="emon2influx.errors"):
         for _ in range(5):
-            reporter.report(Category.CRC, "CRC mismatch", signature=SIGNATURE)
+            reporter.report(ErrorEvent(Category.CRC, "CRC mismatch", signature=SIGNATURE))
     messages = [r.getMessage() for r in caplog.records]
     assert len(messages) == 3  # two full records and the "limit reached" notice
     assert "limit reached" in messages[-1]
-    assert reporter.take_counts() == {"crc": 5}
+    assert metrics.snapshot().errors == {"crc": 5}

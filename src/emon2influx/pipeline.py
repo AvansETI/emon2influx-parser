@@ -1,11 +1,10 @@
 """One MQTT message → line-protocol lines, with every problem reported (§6, §8)."""
 
-import logging
-from collections import Counter
 from datetime import datetime
 
-from .diagnostics import ErrorReporter
+from .diagnostics import ErrorEvent, ErrorReporter
 from .errors import Category, RejectedMessage
+from .metrics import Metrics
 from .payload.registry import DecoderRegistry
 from .points import PointBuilder
 from .telegram.parser import TelegramParser
@@ -18,47 +17,46 @@ class Pipeline:
         parser: TelegramParser,
         builder: PointBuilder,
         reporter: ErrorReporter,
+        metrics: Metrics,
     ) -> None:
         self.decoders = decoders
         self.parser = parser
         self.builder = builder
         self.reporter = reporter
-        self.stats: Counter[str] = Counter()
-        self.kits: set[str] = set()
-        self.unknown_codes: Counter[str] = Counter()
+        self.metrics = metrics
 
     def process(self, raw: bytes, received_at: datetime) -> list[str]:
-        self.stats["messages"] += 1
+        self.metrics.incr("messages")
         signature = None
         try:
             payload, signature = self.decoders.decode(raw, received_at)
             reading = self.parser.parse(payload.p1, received_at)
         except RejectedMessage as rejected:
-            self.stats["rejected"] += 1
-            self.reporter.report(
+            self.metrics.incr("rejected")
+            event = ErrorEvent(
                 rejected.category,
                 rejected.message,
                 signature=signature.value if signature else None,
                 line=rejected.line,
-                raw=raw,
-                # The bare `1` and similar messages are expected noise.
-                quarantine=rejected.category != Category.PAYLOAD_SHAPE,
+            )
+            # The bare `1` and similar messages are expected noise.
+            self.reporter.report(
+                event, raw=raw, quarantine=rejected.category != Category.PAYLOAD_SHAPE
             )
             return []
 
-        self.kits.add(signature.value)
+        self.metrics.kit(signature.value)
         for issue in reading.issues:
-            self.reporter.report(
+            event = ErrorEvent(
                 Category(issue.category),
                 issue.message,
                 signature=signature.value,
                 meter=reading.manufacturer,
                 version=reading.version,
                 line=issue.line,
-                # The message is still written: a warning, not an error.
-                level=logging.WARNING,
             )
-        self.unknown_codes.update(reading.unknown_codes)
+            self.reporter.report(event, written=True)
+        self.metrics.unknown_codes(reading.unknown_codes)
         lines = self.builder.build(signature, reading)
-        self.stats["points"] += len(lines)
+        self.metrics.incr("points", len(lines))
         return lines

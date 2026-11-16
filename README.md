@@ -60,4 +60,3 @@ sudo systemctl daemon-reload && sudo systemctl enable --now emon2influx-parser
 journalctl -u emon2influx-parser -f
 ```
 
-A `Dockerfile` is included as an alternative.

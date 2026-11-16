@@ -5,13 +5,17 @@ small state file next to the spool.
 """
 
 import json
+import logging
 from datetime import UTC, datetime
 from pathlib import Path
 
 from influxdb_client.client.write.point import Point
 from influxdb_client.domain.write_precision import WritePrecision
 
+from .sink.writer import WriteError, Writer
 from .telegram.registry import field_map, registry_hash
+
+log = logging.getLogger("emon2influx")
 
 MEASUREMENT = "dsmr_fields"
 
@@ -51,3 +55,24 @@ class FieldMapState:
     def mark_written(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps({"registry": registry_hash()}))
+
+
+class FieldMapPublisher:
+    """Writes `dsmr_fields` once per registry version."""
+
+    def __init__(self, writer: Writer, state: FieldMapState) -> None:
+        self.writer = writer
+        self.state = state
+
+    def publish(self) -> bool:
+        """True when written now; False when current already or when writing failed."""
+        if self.state.is_current():
+            return False
+        try:
+            self.writer.write(field_map_lines())
+        except WriteError as error:
+            log.warning("could not write dsmr_fields (%s); trying again at the next start", error)
+            return False
+        self.state.mark_written()
+        log.info("dsmr_fields written")
+        return True
