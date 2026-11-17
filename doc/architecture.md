@@ -618,7 +618,7 @@ The plan therefore uses the maximum over the whole lifetime.
 | 3   | GitHub repository     | **Done** (2026-11-16). Public repository under AvansETI; releases feed the updater (§11.1).      |
 | 4   | InfluxDB host         | **Done** (2026-11-16). Dev server: the public URL; production: the local address. Both are set in the env file only, never in the repository. |
 | 5   | Field map in InfluxDB | **Done** (2026-11-16). `dsmr_fields` measurement next to the docs (§4.3).                         |
-| 6   | High availability     | **Draft** (2026-11-17). Two sites with identical points via a stamped receipt time: [high-availability.md](high-availability.md). |
+| 6   | High availability     | **Draft** (2026-11-17), issue #2. Two sites with identical points via a stamped receipt time: [high-availability.md](high-availability.md). |
 
 Host names, addresses and tokens belong in the env file. Documentation uses placeholders such
 as `influxdb.example.org` and `192.0.2.10`.

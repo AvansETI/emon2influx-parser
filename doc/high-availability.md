@@ -1,6 +1,6 @@
 # High availability on two sites (design sketch)
 
-Status: **draft, not approved** (2026-11-17). Nothing in this document is built yet.
+Status: **draft, not approved** (2026-11-17), tracked in issue #2. Nothing in this document is built yet.
 
 Goal: two physically separate sites, each with an MQTT broker, InfluxDB, the parser and the
 p1-meter app. When a component on one site fails, the other site keeps working. After
