@@ -107,7 +107,7 @@ until no V01 kits are left. The firmware change belongs in the kit repository, n
 
 - One per site; reads the local broker, writes the local InfluxDB.
 - The spool covers outages of the local InfluxDB. At the current load it grows about
-  200 MB per day; `SPOOL_MAX_MB=2048` covers about 10 days, 8192 about four weeks
+  200 MB per day; the default `SPOOL_MAX_MB=6144` covers about three weeks
   (architecture.md §7).
 - Configuration that changes the points (for example `REQUIRE_VALID_CRC`) must be equal on
   both sites, or the points differ.
