@@ -288,7 +288,11 @@ class diagrams are in [class-diagram.md](class-diagram.md).
    - A file is deleted only after InfluxDB accepted it.
 4. **Replay is idempotent.** InfluxDB overwrites a point with the same series and timestamp, so a crash during replay does not create duplicates.
 5. **Restarts.** After a restart the existing spool is replayed first.
-6. **Size cap.** The spool is capped at `SPOOL_MAX_MB`, default 2 GB. That is roughly 10 days at the current load. When it is full, the oldest files are dropped and the number of lost points is logged as an error.
+6. **Size cap.** The spool is capped at `SPOOL_MAX_MB`, default 6 GB, so it covers an outage of about **three weeks**.
+   - Measured on 2026-11-17: 83 households, about 14,000 points per hour, about 600 bytes per point. That is about 200 MB per day.
+   - Three weeks is then about 4.2 GB; the rest is room for more kits.
+   - When the spool is full, the oldest files are dropped and the number of lost points is logged as an error.
+   - The timestamp is fixed when the message is received and stored in the line protocol, so replayed points land at their original time.
 7. **4xx responses are not retried.** A 4xx other than 429 means bad data or missing permission. The batch goes to the quarantine file and is reported.
 
 Limit: messages that never arrive are lost. That happens when the parser itself or the MQTT connection is down, because the kits publish with QoS 0 and the broker does not keep them.
