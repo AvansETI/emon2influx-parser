@@ -79,7 +79,7 @@ class Settings:
             influx_batch_size=reader.integer("INFLUX_BATCH_SIZE", 500, 1, 50_000),
             influx_flush_interval_ms=reader.integer("INFLUX_FLUSH_INTERVAL_MS", 1000, 50, 60_000),
             spool_dir=Path(reader.text("SPOOL_DIR", "spool")),
-            spool_max_mb=reader.integer("SPOOL_MAX_MB", 2048, 1, 1_000_000),
+            spool_max_mb=reader.integer("SPOOL_MAX_MB", 6144, 1, 1_000_000),
             signature_prefixes=reader.prefixes("SIGNATURE_PREFIXES", "2019-ETI-EMON-V01"),
             require_valid_crc=reader.boolean("REQUIRE_VALID_CRC", False),
             mode=mode,
